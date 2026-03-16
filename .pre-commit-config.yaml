@@ -1,0 +1,58 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: bash -lc 'UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/uv-cache} uv run ruff format "$@"' --
+        language: system
+        types_or: [python]
+        pass_filenames: true
+
+      - id: ruff-check
+        name: ruff check
+        entry: bash -lc 'UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/uv-cache} uv run ruff check "$@"' --
+        language: system
+        types_or: [python]
+        pass_filenames: true
+
+      - id: prettier
+        name: prettier
+        entry: bash -lc 'COREPACK_HOME=${COREPACK_HOME:-/tmp/corepack} pnpm exec prettier --write "$@"' --
+        language: system
+        files: \.(ts|tsx|js|jsx|json|md|css|ya?ml)$
+        pass_filenames: true
+
+      - id: python-typecheck
+        name: python typecheck
+        entry: bash -lc 'UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/uv-cache} uv run mypy apps/api/src apps/worker/src packages/atlas-core/src tests'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: python-tests
+        name: python tests
+        entry: bash -lc 'UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/uv-cache} uv run pytest tests/test_api_health.py tests/test_worker_boot.py'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: frontend-test
+        name: frontend tests
+        entry: bash -lc 'COREPACK_HOME=${COREPACK_HOME:-/tmp/corepack} pnpm --filter @atlas/console test'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: frontend-typecheck
+        name: frontend typecheck
+        entry: bash -lc 'COREPACK_HOME=${COREPACK_HOME:-/tmp/corepack} pnpm --filter @atlas/console typecheck && COREPACK_HOME=${COREPACK_HOME:-/tmp/corepack} pnpm --filter @atlas/shared-types typecheck'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

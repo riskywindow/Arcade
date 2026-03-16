@@ -1,0 +1,16 @@
+{
+  "name": "atlas-bastion",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm --filter @atlas/console dev",
+    "format:check": "prettier --check AGENTS.md PLANS.md README.md progress.md docs apps/console packages/shared-types .editorconfig .pre-commit-config.yaml .github/workflows/ci.yml",
+    "format": "prettier --write AGENTS.md PLANS.md README.md progress.md docs apps/console packages/shared-types .github/workflows/ci.yml",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  }
+}
