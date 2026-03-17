@@ -3,6 +3,10 @@ import type {
   ApprovalListResponse,
   ApprovalRequestRef,
   ApprovalResponse,
+  BenchmarkRunComparison,
+  BenchmarkRunComparisonResponse,
+  BenchmarkRunResult,
+  BenchmarkRunResultResponse,
   Run,
   RunListResponse,
   RunReplay,
@@ -21,9 +25,7 @@ export type PendingApprovalQueueItem = {
 
 export type InterruptibleRun = Run;
 
-export async function getRuns(
-  fetchImpl: typeof fetch = fetch,
-): Promise<Run[]> {
+export async function getRuns(fetchImpl: typeof fetch = fetch): Promise<Run[]> {
   const response = await fetchImpl(`${apiBaseUrl}/runs`, {
     cache: "no-store",
     headers: {
@@ -77,6 +79,61 @@ export async function getRunReplay(
   return payload.replay;
 }
 
+export async function getBenchmarkRunResult(
+  catalogId: string,
+  benchmarkRunId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<BenchmarkRunResult> {
+  const response = await fetchImpl(
+    `${apiBaseUrl}/benchmarks/catalogs/${catalogId}/runs/${benchmarkRunId}`,
+    {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `failed to load benchmark ${benchmarkRunId}: ${response.status}`,
+    );
+  }
+
+  const payload = (await response.json()) as BenchmarkRunResultResponse;
+  return payload.result;
+}
+
+export async function getBenchmarkRunComparison(
+  catalogId: string,
+  baselineBenchmarkRunId: string,
+  candidateBenchmarkRunId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<BenchmarkRunComparison> {
+  const params = new URLSearchParams({
+    baseline_benchmark_run_id: baselineBenchmarkRunId,
+    candidate_benchmark_run_id: candidateBenchmarkRunId,
+  });
+  const response = await fetchImpl(
+    `${apiBaseUrl}/benchmarks/catalogs/${catalogId}/compare?${params.toString()}`,
+    {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `failed to compare benchmark ${candidateBenchmarkRunId} against ${baselineBenchmarkRunId}: ${response.status}`,
+    );
+  }
+
+  const payload = (await response.json()) as BenchmarkRunComparisonResponse;
+  return payload.comparison;
+}
+
 export async function getRunApprovals(
   runId: string,
   fetchImpl: typeof fetch = fetch,
@@ -89,7 +146,9 @@ export async function getRunApprovals(
   });
 
   if (!response.ok) {
-    throw new Error(`failed to load approvals for ${runId}: ${response.status}`);
+    throw new Error(
+      `failed to load approvals for ${runId}: ${response.status}`,
+    );
   }
 
   const payload = (await response.json()) as ApprovalListResponse;
@@ -127,21 +186,19 @@ export async function getInterruptibleRuns(
   );
 }
 
-async function resolveApproval(
-  {
-    runId,
-    approvalRequestId,
-    decision,
-    payload,
-    fetchImpl = fetch,
-  }: {
-    runId: string;
-    approvalRequestId: string;
-    decision: "approve" | "deny";
-    payload: ApprovalDecisionRequest;
-    fetchImpl?: typeof fetch;
-  },
-): Promise<ApprovalRequestRef> {
+async function resolveApproval({
+  runId,
+  approvalRequestId,
+  decision,
+  payload,
+  fetchImpl = fetch,
+}: {
+  runId: string;
+  approvalRequestId: string;
+  decision: "approve" | "deny";
+  payload: ApprovalDecisionRequest;
+  fetchImpl?: typeof fetch;
+}): Promise<ApprovalRequestRef> {
   const response = await fetchImpl(
     `${apiBaseUrl}/runs/${runId}/approvals/${approvalRequestId}/${decision}`,
     {
@@ -156,7 +213,9 @@ async function resolveApproval(
   );
 
   if (!response.ok) {
-    throw new Error(`failed to ${decision} ${approvalRequestId}: ${response.status}`);
+    throw new Error(
+      `failed to ${decision} ${approvalRequestId}: ${response.status}`,
+    );
   }
 
   const resolved = (await response.json()) as ApprovalResponse;

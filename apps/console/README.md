@@ -12,6 +12,7 @@ Current scope:
 - seeded internal wiki routes under `/internal/wiki`,
 - typed imports from `@atlas/shared-types`,
 - `/runs` operator dashboard with run filtering, demo-run discovery, and a minimal run detail route,
+- `/reports/benchmarks/[catalogId]/[benchmarkRunId]` for screenshot-friendly benchmark scorecards and optional baseline comparison,
 - approval and kill-switch operator panels backed by the local API,
 - no rich replay timeline UI yet.
 
@@ -24,6 +25,7 @@ pnpm --filter @atlas/console dev
 Future replay UI insertion points:
 
 - `app/runs/` for richer run detail and replay routes
+- `app/reports/benchmarks/` for benchmark scorecards and comparison readouts
 - `components/` for replay panels and event timeline primitives
 - `lib/api/` for typed console-to-API boundaries
 

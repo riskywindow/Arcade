@@ -7,7 +7,12 @@ import { RunOutcomePanel } from "@/components/runs/run-outcome-panel";
 import { RunSecurityPanels } from "@/components/runs/run-security-panels";
 import { SectionCard } from "@/components/section-card";
 import { getRunReplay } from "@/lib/api/runs";
-import { deriveRunType, formatTimestamp, runTypeLabel } from "@/lib/runs";
+import {
+  benchmarkRunIdFromRunId,
+  deriveRunType,
+  formatTimestamp,
+  runTypeLabel,
+} from "@/lib/runs";
 
 type RunDetailPageProps = {
   params: Promise<{
@@ -19,6 +24,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
   const { runId } = await params;
   const replay = await getRunReplay(runId);
   const runType = deriveRunType(replay.run);
+  const benchmarkRunId = benchmarkRunIdFromRunId(replay.run.runId);
 
   return (
     <div style={styles.page}>
@@ -31,9 +37,19 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             {runTypeLabel(runType)}
           </p>
         </div>
-        <Link href="/runs" style={styles.link}>
-          Back to runs
-        </Link>
+        <div style={styles.linkRow}>
+          {benchmarkRunId ? (
+            <Link
+              href={`/reports/benchmarks/helpdesk-v0/${benchmarkRunId}`}
+              style={styles.link}
+            >
+              Open benchmark report
+            </Link>
+          ) : null}
+          <Link href="/runs" style={styles.link}>
+            Back to runs
+          </Link>
+        </div>
       </div>
 
       <div style={styles.grid}>
@@ -60,15 +76,21 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             </div>
             <div>
               <dt style={styles.term}>Created</dt>
-              <dd style={styles.value}>{formatTimestamp(replay.run.createdAt)}</dd>
+              <dd style={styles.value}>
+                {formatTimestamp(replay.run.createdAt)}
+              </dd>
             </div>
             <div>
               <dt style={styles.term}>Completed</dt>
-              <dd style={styles.value}>{formatTimestamp(replay.run.completedAt)}</dd>
+              <dd style={styles.value}>
+                {formatTimestamp(replay.run.completedAt)}
+              </dd>
             </div>
             <div>
               <dt style={styles.term}>Agent</dt>
-              <dd style={styles.value}>{replay.run.activeAgentId ?? "unassigned"}</dd>
+              <dd style={styles.value}>
+                {replay.run.activeAgentId ?? "unassigned"}
+              </dd>
             </div>
             <div>
               <dt style={styles.term}>Timeline entries</dt>
@@ -132,6 +154,12 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: "999px",
     border: "1px solid var(--border)",
     background: "var(--panel)",
+  },
+  linkRow: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   grid: {
     display: "grid",

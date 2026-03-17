@@ -6,10 +6,7 @@ export function deriveRunType(run: Run): DerivedRunType {
   const runId = run.runId.toLowerCase();
   const scenarioId = run.scenario.scenarioId.toLowerCase();
 
-  if (
-    runId.includes("demo") ||
-    scenarioId === "travel-lockout-recovery"
-  ) {
+  if (runId.includes("demo") || scenarioId === "travel-lockout-recovery") {
     return "seeded_demo";
   }
 
@@ -32,7 +29,8 @@ export function selectPrimaryDemoRun(runs: Run[]): Run | null {
   return (
     runs.find((run) => isFlagshipDemoRun(run)) ??
     runs.find(
-      (run) => deriveRunType(run) === "seeded_demo" && run.status === "succeeded",
+      (run) =>
+        deriveRunType(run) === "seeded_demo" && run.status === "succeeded",
     ) ??
     runs.find((run) => deriveRunType(run) === "seeded_demo") ??
     runs[0] ??
@@ -62,8 +60,7 @@ export function selectAttentionDemoRun(
         run.runId !== primaryRunId && deriveRunType(run) === "seeded_demo",
     ) ??
     runs.find(
-      (run) =>
-        run.runId !== primaryRunId && run.status === "waiting_approval",
+      (run) => run.runId !== primaryRunId && run.status === "waiting_approval",
     ) ??
     runs.find(
       (run) =>
@@ -82,6 +79,14 @@ export function runTypeLabel(runType: DerivedRunType): string {
     return "Benchmark";
   }
   return "Standard";
+}
+
+export function benchmarkRunIdFromRunId(runId: string): string | null {
+  const delimiterIndex = runId.indexOf("--");
+  if (delimiterIndex <= 0) {
+    return null;
+  }
+  return runId.slice(0, delimiterIndex);
 }
 
 export function runDateKey(run: Run): string {

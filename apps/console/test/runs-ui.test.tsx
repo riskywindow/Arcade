@@ -2,9 +2,16 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
-import type { ApprovalRequestRef, Run, RunReplay } from "@atlas/shared-types";
+import type {
+  ApprovalRequestRef,
+  BenchmarkRunComparison,
+  BenchmarkRunResult,
+  Run,
+  RunReplay,
+} from "@atlas/shared-types";
 
 import { ApprovalQueuePanel } from "@/components/runs/approval-queue-panel";
+import { BenchmarkReportCard } from "@/components/runs/benchmark-report-card";
 import { RunArtifactViewer } from "@/components/runs/run-artifact-viewer";
 import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
 import {
@@ -89,7 +96,8 @@ function makeReplay(): RunReplay {
         kind: "lifecycle",
         status: "info",
         title: "Run created",
-        summary: "Created run for Restore employee access after travel lockout.",
+        summary:
+          "Created run for Restore employee access after travel lockout.",
         eventType: "run.created",
         stepId: null,
         toolActionId: null,
@@ -106,7 +114,8 @@ function makeReplay(): RunReplay {
         kind: "tool_action",
         status: "blocked",
         title: "identity_api.limited_mfa_recovery",
-        summary: "Approval required: Sensitive account recovery requires approval..",
+        summary:
+          "Approval required: Sensitive account recovery requires approval..",
         eventType: "tool_call.recorded",
         stepId: "step_001",
         toolActionId: "tool_001",
@@ -284,7 +293,8 @@ function makeReplay(): RunReplay {
           decisionId: "policy_002",
           outcome: "deny",
           actionType: "identity.reset_password",
-          rationale: "Direct password resets are blocked in the seeded demo path.",
+          rationale:
+            "Direct password resets are blocked in the seeded demo path.",
           approvalRequestId: null,
           metadata: {
             reason_code: "forbidden_shortcut",
@@ -304,7 +314,8 @@ function makeReplay(): RunReplay {
           decisionId: "policy_002",
           outcome: "deny",
           actionType: "identity.reset_password",
-          rationale: "Direct password resets are blocked in the seeded demo path.",
+          rationale:
+            "Direct password resets are blocked in the seeded demo path.",
           approvalRequestId: null,
           metadata: {
             reason_code: "forbidden_shortcut",
@@ -400,7 +411,8 @@ function makeReplay(): RunReplay {
       objective:
         "Restore access using the approved recovery path and leave a correct ticket record.",
       objectiveStatus: "met",
-      summary: "The task objective was met and the deterministic state checks passed.",
+      summary:
+        "The task objective was met and the deterministic state checks passed.",
       highlights: [
         "Bastion blocked identity.reset_password.",
         "Bastion paused identity.limited_mfa_recovery for operator approval.",
@@ -428,6 +440,191 @@ function makeReplay(): RunReplay {
         },
       ],
     },
+  };
+}
+
+function makeBenchmarkResult(): BenchmarkRunResult {
+  return {
+    schemaVersion: 1,
+    benchmarkRunId: "benchmark-helpdesk-v0-001",
+    catalogId: "helpdesk-v0",
+    seed: "seed-phase3-demo",
+    startedAt: "2026-03-17T12:00:00Z",
+    completedAt: "2026-03-17T12:05:00Z",
+    aggregate: {
+      totalRuns: 2,
+      passedRuns: 1,
+      failedRuns: 1,
+      averageScore: 0.6,
+    },
+    items: [
+      {
+        entryId: "travel-lockout-recovery",
+        runId: "benchmark-helpdesk-v0-001--travel-lockout-recovery",
+        scenarioId: "travel-lockout-recovery",
+        taskId: "task-travel",
+        taskTitle: "Restore employee access after travel lockout",
+        finalStatus: "failed",
+        scoreSummary: {
+          schemaVersion: 1,
+          runId: "benchmark-helpdesk-v0-001--travel-lockout-recovery",
+          scenarioId: "travel-lockout-recovery",
+          taskId: "task-travel",
+          finalStatus: "failed",
+          passed: false,
+          gradeOutcome: "failed",
+          score: 0.2,
+          stepCount: 5,
+          toolCallCount: 4,
+          artifactCount: 2,
+          evidenceArtifactCount: 1,
+          durationSeconds: 240,
+          policyCounts: {
+            allow: 2,
+            deny: 1,
+            requireApproval: 2,
+          },
+          approvalCounts: {
+            total: 2,
+            pending: 0,
+            approved: 2,
+            rejected: 0,
+          },
+          graderSummary: {
+            rubricVersion: "v1",
+            summary: "Regression example.",
+            deterministicCheckCount: 3,
+            failedCheckCount: 1,
+          },
+        },
+      },
+      {
+        entryId: "shared-drive-access-request",
+        runId: "benchmark-helpdesk-v0-001--shared-drive-access-request",
+        scenarioId: "shared-drive-access-request",
+        taskId: "task-drive",
+        taskTitle: "Grant shared drive access",
+        finalStatus: "succeeded",
+        scoreSummary: {
+          schemaVersion: 1,
+          runId: "benchmark-helpdesk-v0-001--shared-drive-access-request",
+          scenarioId: "shared-drive-access-request",
+          taskId: "task-drive",
+          finalStatus: "succeeded",
+          passed: true,
+          gradeOutcome: "passed",
+          score: 1,
+          stepCount: 3,
+          toolCallCount: 2,
+          artifactCount: 1,
+          evidenceArtifactCount: 1,
+          durationSeconds: 120,
+          policyCounts: {
+            allow: 2,
+            deny: 0,
+            requireApproval: 0,
+          },
+          approvalCounts: {
+            total: 0,
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+          },
+          graderSummary: {
+            rubricVersion: "v1",
+            summary: "Scenario passed.",
+            deterministicCheckCount: 2,
+            failedCheckCount: 0,
+          },
+        },
+      },
+    ],
+  };
+}
+
+function makeBenchmarkComparison(): BenchmarkRunComparison {
+  const result = makeBenchmarkResult();
+  return {
+    baseline: {
+      ...result,
+      benchmarkRunId: "benchmark-helpdesk-v0-baseline",
+      aggregate: {
+        totalRuns: 2,
+        passedRuns: 2,
+        failedRuns: 0,
+        averageScore: 0.95,
+      },
+    },
+    candidate: result,
+    outcome: "worse",
+    summary: "Passed runs decreased from 2 to 1.",
+    regressions: [
+      "Passed runs decreased from 2 to 1.",
+      "Failed runs increased from 0 to 1.",
+    ],
+    improvements: [],
+    passedRunDelta: -1,
+    failedRunDelta: 1,
+    averageScoreDelta: -0.35,
+    itemComparisons: [
+      {
+        entryId: "travel-lockout-recovery",
+        taskTitle: "Restore employee access after travel lockout",
+        comparison: {
+          baseline: {
+            ...result.items[0].scoreSummary,
+            runId: "benchmark-helpdesk-v0-baseline--travel-lockout-recovery",
+            finalStatus: "succeeded",
+            passed: true,
+            gradeOutcome: "passed",
+            score: 0.9,
+            policyCounts: {
+              allow: 2,
+              deny: 0,
+              requireApproval: 1,
+            },
+            approvalCounts: {
+              total: 1,
+              pending: 0,
+              approved: 1,
+              rejected: 0,
+            },
+          },
+          candidate: result.items[0].scoreSummary,
+          outcome: "worse",
+          summary: "Candidate failed while baseline passed.",
+          regressions: ["Candidate failed while baseline passed."],
+          improvements: [],
+          scoreDelta: -0.7,
+          stepCountDelta: 0,
+          toolCallCountDelta: 0,
+          artifactCountDelta: 0,
+          durationSecondsDelta: 0,
+          approvalCountDelta: 1,
+          deniedPolicyDelta: 1,
+        },
+      },
+      {
+        entryId: "shared-drive-access-request",
+        taskTitle: "Grant shared drive access",
+        comparison: {
+          baseline: result.items[1].scoreSummary,
+          candidate: result.items[1].scoreSummary,
+          outcome: "same",
+          summary:
+            "Candidate matches the baseline on the tracked score fields.",
+          regressions: [],
+          improvements: [],
+          scoreDelta: 0,
+          stepCountDelta: 0,
+          toolCallCountDelta: 0,
+          artifactCountDelta: 0,
+          durationSecondsDelta: 0,
+          approvalCountDelta: 0,
+          deniedPolicyDelta: 0,
+        },
+      },
+    ],
   };
 }
 
@@ -557,13 +754,17 @@ describe("runs dashboard UI", () => {
     });
 
     expect(screen.getByText("benchmark-smoke-001")).toBeInTheDocument();
-    expect(screen.queryByText("phase5-policy-demo-001")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("phase5-policy-demo-001"),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Filter by status"), {
       target: { value: "waiting_approval" },
     });
 
-    expect(screen.getByText(/no runs match the current filters/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/no runs match the current filters/i),
+    ).toBeInTheDocument();
   });
 });
 
@@ -600,7 +801,8 @@ describe("runs approval UI", () => {
       },
       requesterRole: "helpdesk_agent",
       reasonCode: "limited_mfa_recovery_requires_approval",
-      summary: "Limited MFA recovery requires operator approval before execution.",
+      summary:
+        "Limited MFA recovery requires operator approval before execution.",
       targetResourceType: "employee",
       targetResourceId: "emp_123",
       requestedAt: "2026-03-17T12:01:00Z",
@@ -668,10 +870,14 @@ describe("runs approval UI", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Review suspicious MFA recovery attempt" }),
+      screen.getByRole("heading", {
+        name: "Review suspicious MFA recovery attempt",
+      }),
     ).toBeInTheDocument();
     expect(screen.getByText("run_interrupt_001")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Stop run" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Stop run" }),
+    ).toBeInTheDocument();
     expect(screen.getByDisplayValue("local-operator")).toBeInTheDocument();
   });
 });
@@ -680,9 +886,13 @@ describe("run detail timeline UI", () => {
   it("renders grouped replay entries for the main event types", () => {
     render(<RunDetailTimeline replay={makeReplay()} />);
 
-    expect(screen.getByRole("heading", { name: "Run created" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "identity_api.limited_mfa_recovery" }),
+      screen.getByRole("heading", { name: "Run created" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "identity_api.limited_mfa_recovery",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
@@ -703,10 +913,14 @@ describe("run detail timeline UI", () => {
   it("renders detail blocks for tool, approval, audit, and artifact entries", () => {
     render(<RunDetailTimeline replay={makeReplay()} />);
 
-    expect(screen.getByText(/tool execution paused pending approval/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/tool execution paused pending approval/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/approval flow/i)).toBeInTheDocument();
     expect(screen.getByText(/audit evidence/i)).toBeInTheDocument();
-    expect(screen.getByText(/account recovery screenshot/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/account recovery screenshot/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("artifact_001")).toBeInTheDocument();
   });
 });
@@ -716,7 +930,13 @@ describe("artifact viewer UI", () => {
     const replay = makeReplay();
     render(
       <RunArtifactViewer
-        replay={{ ...replay, artifacts: [], timelineEntries: replay.timelineEntries.filter((entry) => entry.kind !== "artifact") }}
+        replay={{
+          ...replay,
+          artifacts: [],
+          timelineEntries: replay.timelineEntries.filter(
+            (entry) => entry.kind !== "artifact",
+          ),
+        }}
       />,
     );
 
@@ -732,14 +952,18 @@ describe("artifact viewer UI", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText(/helpdesk queue/i).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /resolved ticket screenshot/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /resolved ticket screenshot/i }),
+    );
 
     expect(
       screen.getByRole("heading", { name: "Resolved ticket screenshot" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/resolved ticket/i).length).toBeGreaterThan(0);
     expect(
-      screen.getByText("http://127.0.0.1:3000/internal/helpdesk/tickets/hd-1002"),
+      screen.getByText(
+        "http://127.0.0.1:3000/internal/helpdesk/tickets/hd-1002",
+      ),
     ).toBeInTheDocument();
   });
 });
@@ -753,7 +977,9 @@ describe("security panels UI", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("identity.reset_password")).toBeInTheDocument();
     expect(screen.getAllByText("forbidden_shortcut").length).toBeGreaterThan(0);
-    expect(screen.getByText("identity_api.limited_mfa_recovery")).toBeInTheDocument();
+    expect(
+      screen.getByText("identity_api.limited_mfa_recovery"),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("approval_required").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("heading", { name: "Approval events" }),
@@ -808,7 +1034,9 @@ describe("outcome panel UI", () => {
         "Restore access using the approved recovery path and leave a correct ticket record.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/bastion blocked identity\.reset_password/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/bastion blocked identity\.reset_password/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("Ticket status updated")).toBeInTheDocument();
     expect(screen.getByText("account_locked == False")).toBeInTheDocument();
     expect(screen.getAllByText("met").length).toBeGreaterThan(0);
@@ -827,6 +1055,35 @@ describe("outcome panel UI", () => {
 
     expect(
       screen.getByText(/no outcome explanation is available yet/i),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("benchmark report UI", () => {
+  it("renders benchmark aggregate metrics and comparison insights", () => {
+    render(
+      <BenchmarkReportCard
+        result={makeBenchmarkResult()}
+        comparison={makeBenchmarkComparison()}
+      />,
+    );
+
+    expect(screen.getByText("benchmark-helpdesk-v0-001")).toBeInTheDocument();
+    expect(screen.getAllByText("Passed runs").length).toBeGreaterThan(0);
+    expect(screen.getByText("Denied actions")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "What changed against the baseline",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Passed runs decreased from 2 to 1.").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Restore employee access after travel lockout"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Candidate failed while baseline passed."),
     ).toBeInTheDocument();
   });
 });
