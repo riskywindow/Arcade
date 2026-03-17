@@ -51,15 +51,26 @@ class ScriptedSmokeResult:
 BASE_TIME = datetime(2026, 3, 16, 12, 0, tzinfo=UTC)
 
 
+SCRIPTED_SCENARIO_IDS = (
+    "travel-lockout-recovery",
+    "shared-drive-access-request",
+)
+
+
 def execute_scripted_smoke(
     run_service: RunService,
     *,
     seed: str = "seed-phase3-demo",
     run_prefix: str = "phase3-smoke",
 ) -> ScriptedSmokeResult:
-    outcomes = (
-        _execute_travel_lockout(run_service, seed=seed, run_id=f"{run_prefix}-travel"),
-        _execute_shared_drive(run_service, seed=seed, run_id=f"{run_prefix}-shared-drive"),
+    outcomes = tuple(
+        execute_scripted_scenario(
+            run_service,
+            scenario_id=scenario_id,
+            seed=seed,
+            run_id=f"{run_prefix}-{scenario_id}",
+        )
+        for scenario_id in SCRIPTED_SCENARIO_IDS
     )
     return ScriptedSmokeResult(outcomes=outcomes)
 
@@ -79,6 +90,23 @@ def execute_scripted_smoke_from_config(
         return execute_scripted_smoke(service, seed=seed, run_prefix=run_prefix)
     finally:
         conn.close()
+
+
+def execute_scripted_scenario(
+    run_service: RunService,
+    *,
+    scenario_id: str,
+    seed: str,
+    run_id: str,
+) -> ScriptedSmokeRunOutcome:
+    scripted_executors = {
+        "travel-lockout-recovery": _execute_travel_lockout,
+        "shared-drive-access-request": _execute_shared_drive,
+    }
+    executor = scripted_executors.get(scenario_id)
+    if executor is None:
+        raise KeyError(f"no scripted scenario executor is defined for {scenario_id}")
+    return executor(run_service, seed=seed, run_id=run_id)
 
 
 def _execute_travel_lockout(

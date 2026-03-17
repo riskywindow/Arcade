@@ -5,6 +5,8 @@ FastAPI control-plane API for the live Atlas + Bastion run spine and seeded loca
 Current surface:
 
 - `GET /health`
+- `GET /benchmarks/catalogs/{catalog_id}`
+- `GET /benchmarks/catalogs/{catalog_id}/runs/{benchmark_run_id}`
 - `POST /runs`
 - `GET /runs`
 - `GET /runs/{run_id}`

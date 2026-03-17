@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 
+from atlas_worker.benchmark_runner import execute_benchmark_catalog_from_config
 from atlas_worker.dummy_execution import DummyRunSpec, execute_dummy_run_from_config
 from atlas_worker.agent_execution import (
     SeededAgentRunSpec,
@@ -44,7 +45,14 @@ def main() -> None:
         "command",
         nargs="?",
         default="boot",
-        choices=("boot", "dummy-run", "scripted-smoke", "agent-demo", "policy-demo"),
+        choices=(
+            "boot",
+            "dummy-run",
+            "scripted-smoke",
+            "agent-demo",
+            "policy-demo",
+            "benchmark-run",
+        ),
         help="worker action to run",
     )
     parser.add_argument("--run-id", default="dummy-run-001", help="run id for the dummy execution")
@@ -67,6 +75,16 @@ def main() -> None:
         "--seed",
         default="seed-phase3-demo",
         help="scenario seed for the seeded agent demo path",
+    )
+    parser.add_argument(
+        "--catalog-id",
+        default="helpdesk-v0",
+        help="benchmark catalog id for deterministic benchmark execution",
+    )
+    parser.add_argument(
+        "--benchmark-run-id",
+        default="benchmark-helpdesk-v0-001",
+        help="stable benchmark execution id used to derive persisted run ids",
     )
     parser.add_argument(
         "--browser-mode",
@@ -162,6 +180,38 @@ def main() -> None:
                 "event_count": demo_result.event_count,
                 "artifact_count": demo_result.artifact_count,
                 "browser_mode": args.browser_mode,
+            }
+        )
+        return
+
+    if args.command == "benchmark-run":
+        benchmark_result = execute_benchmark_catalog_from_config(
+            config,
+            catalog_id=args.catalog_id,
+            benchmark_run_id=args.benchmark_run_id,
+            seed=args.seed,
+            schema_name=args.schema_name,
+        )
+        print(
+            {
+                "benchmark_run_id": benchmark_result.benchmark_run_id,
+                "catalog_id": benchmark_result.catalog_id,
+                "seed": benchmark_result.seed,
+                "run_count": benchmark_result.aggregate.total_runs,
+                "passed_runs": benchmark_result.aggregate.passed_runs,
+                "failed_runs": benchmark_result.aggregate.failed_runs,
+                "average_score": benchmark_result.aggregate.average_score,
+                "items": [
+                    {
+                        "entry_id": item.entry_id,
+                        "run_id": item.run_id,
+                        "scenario_id": item.scenario_id,
+                        "final_status": item.final_status,
+                        "passed": item.score_summary.passed,
+                        "score": item.score_summary.score,
+                    }
+                    for item in benchmark_result.items
+                ],
             }
         )
         return

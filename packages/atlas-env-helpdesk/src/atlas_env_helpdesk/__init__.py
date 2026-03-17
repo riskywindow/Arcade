@@ -4,6 +4,7 @@ from atlas_core.package_info import PackageInfo
 from atlas_synth import TicketStatus
 
 from atlas_env_helpdesk.catalog import (
+    get_benchmark_catalog_v0,
     get_environment_contract,
     get_scenario_definition,
     list_public_scenarios,
@@ -161,6 +162,7 @@ __all__ = [
     "EmployeeSummary",
     "DeviceSummary",
     "ALLOWED_STATUS_TRANSITIONS",
+    "get_benchmark_catalog_v0",
     "get_environment_contract",
     "get_hidden_scenario_state",
     "get_scenario_definition",

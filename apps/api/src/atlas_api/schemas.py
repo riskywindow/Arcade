@@ -168,6 +168,54 @@ class RunScoreSummarySchema(ApiModel):
     grader_summary: RunScoreGraderSummarySchema | None = None
 
 
+class BenchmarkCatalogEntrySchema(ApiModel):
+    entry_id: str
+    scenario_id: str
+    scenario_name: str
+    task_id: str
+    task_title: str
+    seed: str
+    runner_kind: str
+    tags: list[str] = Field(default_factory=list)
+
+
+class BenchmarkCatalogSchema(ApiModel):
+    schema_version: int = 1
+    catalog_id: str
+    title: str
+    description: str
+    environment_id: str
+    entries: list[BenchmarkCatalogEntrySchema] = Field(default_factory=list)
+
+
+class BenchmarkRunItemResultSchema(ApiModel):
+    entry_id: str
+    run_id: str
+    scenario_id: str
+    task_id: str
+    task_title: str
+    final_status: str
+    score_summary: RunScoreSummarySchema
+
+
+class BenchmarkRunAggregateSchema(ApiModel):
+    total_runs: int
+    passed_runs: int
+    failed_runs: int
+    average_score: float | None = None
+
+
+class BenchmarkRunResultSchema(ApiModel):
+    schema_version: int = 1
+    benchmark_run_id: str
+    catalog_id: str
+    seed: str
+    started_at: datetime
+    completed_at: datetime
+    items: list[BenchmarkRunItemResultSchema] = Field(default_factory=list)
+    aggregate: BenchmarkRunAggregateSchema
+
+
 class RunSchema(ApiModel):
     run_id: str
     environment: EnvironmentRefSchema
@@ -479,6 +527,14 @@ class RunEventListResponse(ApiModel):
 
 class RunReplayResponse(ApiModel):
     replay: RunReplaySchema
+
+
+class BenchmarkCatalogResponse(ApiModel):
+    catalog: BenchmarkCatalogSchema
+
+
+class BenchmarkRunResultResponse(ApiModel):
+    result: BenchmarkRunResultSchema
 
 
 class ArtifactListResponse(ApiModel):

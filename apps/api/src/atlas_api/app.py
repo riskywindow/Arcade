@@ -11,6 +11,10 @@ from fastapi.responses import FileResponse
 from atlas_api.config import ApiConfig, load_config
 from atlas_api.schemas import (
     AddTicketNoteRequest,
+    BenchmarkCatalogResponse,
+    BenchmarkCatalogSchema,
+    BenchmarkRunResultResponse,
+    BenchmarkRunResultSchema,
     ApprovalDecisionRequest,
     ApprovalListResponse,
     ApprovalResponse,
@@ -58,6 +62,9 @@ from atlas_core import (
     AuditEventKind,
     AuditRecordEnvelope,
     AuditRecordedPayload,
+    BenchmarkCatalog,
+    BenchmarkRunItemResult,
+    BenchmarkRunResult,
     EnvironmentRef,
     GradeOutcome,
     GradeResult,
@@ -80,6 +87,8 @@ from atlas_core import (
     build_replay_outcome_explanation,
     build_run_replay,
     build_run_score_summary,
+    benchmark_entry_run_id,
+    build_benchmark_aggregate,
     open_run_store_connection,
 )
 from atlas_env_helpdesk import (
@@ -90,6 +99,7 @@ from atlas_env_helpdesk import (
     InvalidTicketTransitionError,
     TicketStatus,
     WikiDocumentNotFoundError,
+    get_benchmark_catalog_v0,
     get_scenario_definition,
 )
 
@@ -125,6 +135,14 @@ def _to_run_replay_schema(replay: RunReplay) -> RunReplaySchema:
     return RunReplaySchema.model_validate(replay.model_dump(mode="json"))
 
 
+def _to_benchmark_catalog_schema(catalog: BenchmarkCatalog) -> BenchmarkCatalogSchema:
+    return BenchmarkCatalogSchema.model_validate(catalog.model_dump(mode="json"))
+
+
+def _to_benchmark_run_result_schema(result: BenchmarkRunResult) -> BenchmarkRunResultSchema:
+    return BenchmarkRunResultSchema.model_validate(result.model_dump(mode="json"))
+
+
 def _score_summary_for_run(
     run: Run,
     *,
@@ -135,6 +153,58 @@ def _score_summary_for_run(
     run_events = events if events is not None else run_service.list_run_events(run.run_id)
     run_artifacts = artifacts if artifacts is not None else run_service.list_run_artifacts(run.run_id)
     return build_run_score_summary(run, run_events, run_artifacts)
+
+
+def _benchmark_catalog(catalog_id: str) -> BenchmarkCatalog:
+    if catalog_id == "helpdesk-v0":
+        return get_benchmark_catalog_v0()
+    raise KeyError(f"unknown benchmark catalog: {catalog_id}")
+
+
+def _benchmark_result(
+    *,
+    catalog: BenchmarkCatalog,
+    benchmark_run_id: str,
+    run_service: RunService,
+) -> BenchmarkRunResult:
+    items: list[BenchmarkRunItemResult] = []
+    started_at = None
+    completed_at = None
+    seed = None
+    for entry in catalog.entries:
+        run_id = benchmark_entry_run_id(benchmark_run_id, entry.entry_id)
+        run = run_service.get_run(run_id)
+        if run is None:
+            raise RunNotFoundError(f"run {run_id} does not exist")
+        events = run_service.list_run_events(run_id)
+        artifacts = run_service.list_run_artifacts(run_id)
+        score_summary = build_run_score_summary(run, events, artifacts)
+        items.append(
+            BenchmarkRunItemResult(
+                entry_id=entry.entry_id,
+                run_id=run_id,
+                scenario_id=entry.scenario_id,
+                task_id=entry.task_id,
+                task_title=entry.task_title,
+                final_status=run.status.value,
+                score_summary=score_summary,
+            )
+        )
+        started_at = run.created_at if started_at is None else min(started_at, run.created_at)
+        run_completed_at = run.completed_at or run.updated_at
+        completed_at = (
+            run_completed_at if completed_at is None else max(completed_at, run_completed_at)
+        )
+        seed = run.scenario.scenario_seed if seed is None else seed
+    return BenchmarkRunResult(
+        benchmark_run_id=benchmark_run_id,
+        catalog_id=catalog.catalog_id,
+        seed=seed or "seed-phase3-demo",
+        started_at=started_at,
+        completed_at=completed_at,
+        items=tuple(items),
+        aggregate=build_benchmark_aggregate(tuple(items)),
+    )
 
 
 def _apply_outcome_objective(replay: RunReplay) -> RunReplay:
@@ -445,6 +515,36 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
         except InboxThreadNotFoundError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         return InboxThreadResponse(thread=_to_inbox_thread_schema(thread))
+
+    @app.get("/benchmarks/catalogs/{catalog_id}", response_model=BenchmarkCatalogResponse)
+    def get_benchmark_catalog(
+        catalog_id: str,
+    ) -> BenchmarkCatalogResponse:
+        try:
+            catalog = _benchmark_catalog(catalog_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        return BenchmarkCatalogResponse(catalog=_to_benchmark_catalog_schema(catalog))
+
+    @app.get(
+        "/benchmarks/catalogs/{catalog_id}/runs/{benchmark_run_id}",
+        response_model=BenchmarkRunResultResponse,
+    )
+    def get_benchmark_run_result(
+        catalog_id: str,
+        benchmark_run_id: str,
+        run_service: RunService = Depends(get_run_service),
+    ) -> BenchmarkRunResultResponse:
+        try:
+            catalog = _benchmark_catalog(catalog_id)
+            result = _benchmark_result(
+                catalog=catalog,
+                benchmark_run_id=benchmark_run_id,
+                run_service=run_service,
+            )
+        except (KeyError, RunNotFoundError) as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        return BenchmarkRunResultResponse(result=_to_benchmark_run_result_schema(result))
 
     @app.post("/runs", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
     def create_run(

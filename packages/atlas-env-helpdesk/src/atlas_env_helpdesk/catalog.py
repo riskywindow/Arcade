@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from atlas_core import BenchmarkCatalog, BenchmarkCatalogEntry, BenchmarkRunnerKind
 from atlas_synth import FIXTURE_SLUG
 
 from atlas_env_helpdesk.contracts import (
@@ -81,6 +82,37 @@ def get_scenario_definition(scenario_id: str) -> HelpdeskScenarioDefinition:
 
 def list_public_scenarios():
     return tuple(scenario.public_definition() for scenario in list_scenarios())
+
+
+def get_benchmark_catalog_v0(*, seed: str = "seed-phase3-demo") -> BenchmarkCatalog:
+    scenarios = {
+        scenario.scenario_id: scenario
+        for scenario in list_scenarios()
+    }
+    entry_ids = (
+        "travel-lockout-recovery",
+        "shared-drive-access-request",
+    )
+    entries = tuple(
+        BenchmarkCatalogEntry(
+            entry_id=scenario_id,
+            scenario_id=scenario_id,
+            scenario_name=scenarios[scenario_id].scenario_name,
+            task_id=scenarios[scenario_id].public_task.task_id,
+            task_title=scenarios[scenario_id].public_task.task_title,
+            seed=seed,
+            runner_kind=BenchmarkRunnerKind.SCRIPTED_HELPDESK,
+            tags=("phase6", "deterministic", "helpdesk_v0"),
+        )
+        for scenario_id in entry_ids
+    )
+    return BenchmarkCatalog(
+        catalog_id="helpdesk-v0",
+        title="Helpdesk Benchmark v0",
+        description="Small deterministic helpdesk benchmark over the first scripted seeded scenarios.",
+        environment_id=ENVIRONMENT_ID,
+        entries=entries,
+    )
 
 
 def _build_definition(

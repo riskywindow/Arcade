@@ -731,6 +731,56 @@ export type RunScoreSummary = {
   graderSummary?: RunScoreGraderSummary | null;
 };
 
+export type BenchmarkRunnerKind = "scripted_helpdesk";
+
+export type BenchmarkCatalogEntry = {
+  entryId: string;
+  scenarioId: string;
+  scenarioName: string;
+  taskId: string;
+  taskTitle: string;
+  seed: string;
+  runnerKind: BenchmarkRunnerKind;
+  tags: string[];
+};
+
+export type BenchmarkCatalog = {
+  schemaVersion: number;
+  catalogId: string;
+  title: string;
+  description: string;
+  environmentId: string;
+  entries: BenchmarkCatalogEntry[];
+};
+
+export type BenchmarkRunItemResult = {
+  entryId: string;
+  runId: string;
+  scenarioId: string;
+  taskId: string;
+  taskTitle: string;
+  finalStatus: string;
+  scoreSummary: RunScoreSummary;
+};
+
+export type BenchmarkRunAggregate = {
+  totalRuns: number;
+  passedRuns: number;
+  failedRuns: number;
+  averageScore?: number | null;
+};
+
+export type BenchmarkRunResult = {
+  schemaVersion: number;
+  benchmarkRunId: string;
+  catalogId: string;
+  seed: string;
+  startedAt: string;
+  completedAt: string;
+  items: BenchmarkRunItemResult[];
+  aggregate: BenchmarkRunAggregate;
+};
+
 export type Run = {
   runId: string;
   environment: EnvironmentRef;
@@ -1040,6 +1090,14 @@ export type RunEventListResponse = {
 
 export type RunReplayResponse = {
   replay: RunReplay;
+};
+
+export type BenchmarkCatalogResponse = {
+  catalog: BenchmarkCatalog;
+};
+
+export type BenchmarkRunResultResponse = {
+  result: BenchmarkRunResult;
 };
 
 export type ArtifactListResponse = {

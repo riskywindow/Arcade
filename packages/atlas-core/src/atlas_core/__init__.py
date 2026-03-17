@@ -23,6 +23,17 @@ from atlas_core.bastion import (
     SecretHandleKind,
     SecretsBroker,
 )
+from atlas_core.benchmark import (
+    BenchmarkCatalog,
+    BenchmarkCatalogEntry,
+    BenchmarkRunAggregate,
+    BenchmarkRunItemResult,
+    BenchmarkRunResult,
+    BenchmarkRunnerKind,
+    benchmark_entry_run_id,
+    build_benchmark_aggregate,
+    build_benchmark_run_result,
+)
 from atlas_core.config import InfrastructureConfig, ServiceConfig
 from atlas_core.db import (
     DEFAULT_MIGRATIONS_DIR,
@@ -163,6 +174,12 @@ __all__ = [
     "AuditEventKind",
     "AuditRecordEnvelope",
     "AuditRecorder",
+    "BenchmarkCatalog",
+    "BenchmarkCatalogEntry",
+    "BenchmarkRunAggregate",
+    "BenchmarkRunItemResult",
+    "BenchmarkRunResult",
+    "BenchmarkRunnerKind",
     "BastionToolGateway",
     "BastionToolRequest",
     "BastionToolResponse",
@@ -262,6 +279,9 @@ __all__ = [
     "build_replay_outcome_explanation",
     "build_run_replay",
     "build_run_score_summary",
+    "benchmark_entry_run_id",
+    "build_benchmark_aggregate",
+    "build_benchmark_run_result",
     "ToolSpec",
     "allowed_transitions",
     "applied_versions",

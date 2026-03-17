@@ -9,6 +9,7 @@ Current scope:
 - structured startup and shutdown logging
 - deterministic dummy run execution through the shared `RunService`
 - temporary Phase 3 scripted smoke flow for two seeded tasks
+- explicit Phase 6 helpdesk benchmark catalog and deterministic benchmark runner over the same seeded scripted paths
 - deterministic Phase 4 agent demo loop for `mfa-reenrollment-device-loss`
 - deterministic Phase 5 policy-protected demo loop for `travel-lockout-recovery`
 - typed in-process tool registry for browser, helpdesk ticket, doc lookup, directory lookup, and screenshot capture
@@ -53,6 +54,11 @@ uv run atlas-worker agent-demo --run-id phase4-agent-demo-live-001 --browser-mod
 Phase 5 policy-protected demo:
 ```bash
 uv run atlas-worker policy-demo --run-id phase5-policy-demo-001
+```
+
+Phase 6 benchmark runner:
+```bash
+uv run atlas-worker benchmark-run --catalog-id helpdesk-v0 --benchmark-run-id benchmark-helpdesk-v0-001
 ```
 
 One-command local demo reset:

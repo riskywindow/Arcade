@@ -53,6 +53,7 @@ from atlas_core import (
 )
 from atlas_core.bastion import AuditRecordEnvelope
 from atlas_core.config import InfrastructureConfig
+from atlas_worker.benchmark_runner import execute_benchmark_catalog, get_benchmark_catalog
 
 
 def _timestamp() -> datetime:
@@ -271,6 +272,37 @@ def test_run_api_create_list_get_and_events(api_client: TestClient) -> None:
         "run.started",
         "tool_call.recorded",
     ]
+
+
+def test_benchmark_catalog_and_result_endpoints(api_client: TestClient) -> None:
+    catalog_response = api_client.get("/benchmarks/catalogs/helpdesk-v0")
+    assert catalog_response.status_code == 200
+    assert catalog_response.json()["catalog"]["catalogId"] == "helpdesk-v0"
+    assert [entry["entryId"] for entry in catalog_response.json()["catalog"]["entries"]] == [
+        "travel-lockout-recovery",
+        "shared-drive-access-request",
+    ]
+
+    schema_name = cast(Any, api_client.app).state.database_schema
+    service, service_conn = _run_service(schema_name)
+    try:
+        result = execute_benchmark_catalog(
+            service,
+            catalog=get_benchmark_catalog("helpdesk-v0"),
+            benchmark_run_id="benchmark-api-001",
+        )
+    finally:
+        service_conn.close()
+
+    result_response = api_client.get("/benchmarks/catalogs/helpdesk-v0/runs/benchmark-api-001")
+    assert result_response.status_code == 200
+    payload = result_response.json()["result"]
+    assert payload["benchmarkRunId"] == "benchmark-api-001"
+    assert payload["catalogId"] == "helpdesk-v0"
+    assert payload["aggregate"]["totalRuns"] == 2
+    assert payload["aggregate"]["passedRuns"] == 2
+    assert len(payload["items"]) == 2
+    assert {item["runId"] for item in payload["items"]} == {item.run_id for item in result.items}
 
 
 def test_run_replay_endpoint_returns_grouped_run_detail(api_client: TestClient) -> None:
