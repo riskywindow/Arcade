@@ -189,3 +189,8 @@ def test_screenshot_executor_persists_artifact_and_api_lists_it(
     payload = response.json()
     assert payload["artifacts"][0]["artifactId"] == artifact_id
     assert payload["artifacts"][0]["kind"] == "screenshot"
+
+    content_response = client.get(f"/runs/{run.run_id}/artifacts/{artifact_id}/content")
+    assert content_response.status_code == 200
+    assert content_response.headers["content-type"] == "image/png"
+    assert content_response.content == b"\x89PNG\r\nphase4"

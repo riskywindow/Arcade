@@ -11,6 +11,7 @@ Current surface:
 - `GET /runs/{run_id}/events`
 - `GET /runs/{run_id}/replay`
 - `GET /runs/{run_id}/artifacts`
+- `GET /runs/{run_id}/artifacts/{artifact_id}/content`
 - `GET /runs/{run_id}/audit`
 - `POST /runs/{run_id}/stop`
 - `GET /runs/{run_id}/approvals`

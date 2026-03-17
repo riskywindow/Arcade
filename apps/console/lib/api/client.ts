@@ -1,7 +1,5 @@
 import type { HealthStatus, SystemStatusSnapshot } from "@atlas/shared-types";
-
-const apiBaseUrl =
-  process.env.ATLAS_CONSOLE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import { apiBaseUrl } from "@/lib/api/base-url";
 
 export async function getSystemStatus(
   fetchImpl: typeof fetch = fetch,

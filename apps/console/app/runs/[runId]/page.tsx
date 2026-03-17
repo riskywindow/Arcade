@@ -1,6 +1,7 @@
 import Link from "next/link";
 import React, { type CSSProperties } from "react";
 
+import { RunArtifactViewer } from "@/components/runs/run-artifact-viewer";
 import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
 import { SectionCard } from "@/components/section-card";
 import { getRunReplay } from "@/lib/api/runs";
@@ -101,6 +102,12 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
               <dd style={styles.value}>{replay.outcome.gradeResult?.outcome ?? "not graded"}</dd>
             </div>
           </dl>
+        </SectionCard>
+        <SectionCard
+          title="Artifact viewer"
+          description="Browse screenshots and other evidence without leaving the run detail page."
+        >
+          <RunArtifactViewer replay={replay} />
         </SectionCard>
       </div>
     </div>

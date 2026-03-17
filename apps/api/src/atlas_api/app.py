@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse
 
 from atlas_api.config import ApiConfig, load_config
 from atlas_api.schemas import (
@@ -870,6 +872,38 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
         return ArtifactListResponse(
             run_id=run_id,
             artifacts=[_to_artifact_schema(artifact) for artifact in artifacts],
+        )
+
+    @app.get("/runs/{run_id}/artifacts/{artifact_id}/content")
+    def get_run_artifact_content(
+        run_id: str,
+        artifact_id: str,
+        run_service: RunService = Depends(get_run_service),
+    ) -> FileResponse:
+        try:
+            artifacts = run_service.list_run_artifacts(run_id)
+        except RunNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+        artifact = next((item for item in artifacts if item.artifact_id == artifact_id), None)
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"artifact {artifact_id} does not exist for run {run_id}",
+            )
+
+        artifact_path = Path(artifact.uri)
+        if not artifact_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"artifact {artifact_id} is not available as a local file",
+            )
+
+        filename = artifact.display_name or artifact_path.name
+        return FileResponse(
+            path=artifact_path,
+            media_type=artifact.content_type,
+            filename=filename,
         )
 
     return app

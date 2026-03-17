@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import type { ApprovalRequestRef, Run, RunReplay } from "@atlas/shared-types";
 
 import { ApprovalQueuePanel } from "@/components/runs/approval-queue-panel";
+import { RunArtifactViewer } from "@/components/runs/run-artifact-viewer";
 import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
 import {
   RunDashboard,
@@ -164,6 +165,23 @@ function makeReplay(): RunReplay {
         relatedArtifactIds: [],
       },
       {
+        entryId: "timeline-evt-artifact-2",
+        eventId: "evt-artifact-2",
+        sequence: 7,
+        occurredAt: "2026-03-17T12:05:20Z",
+        kind: "artifact",
+        status: "info",
+        title: "Artifact attached: screenshot",
+        summary: "minio://atlas-artifacts/run_123/screenshot-2.png",
+        eventType: "artifact.attached",
+        stepId: "step_002",
+        toolActionId: null,
+        approvalRequestId: null,
+        auditId: null,
+        artifactId: "artifact_002",
+        relatedArtifactIds: [],
+      },
+      {
         entryId: "timeline-evt-outcome",
         eventId: "evt-outcome",
         sequence: 8,
@@ -193,7 +211,26 @@ function makeReplay(): RunReplay {
         contentType: "image/png",
         displayName: "Account recovery screenshot",
         description: null,
-        metadata: {},
+        metadata: {
+          pageTitle: "Helpdesk Queue",
+          currentUrl: "http://127.0.0.1:3000/internal/helpdesk",
+        },
+      },
+      {
+        artifactId: "artifact_002",
+        eventId: "evt-artifact-2",
+        timelineEntryId: "timeline-evt-artifact-2",
+        stepId: "step_002",
+        createdAt: "2026-03-17T12:05:20Z",
+        kind: "screenshot",
+        uri: "minio://atlas-artifacts/run_123/screenshot-2.png",
+        contentType: "image/png",
+        displayName: "Resolved ticket screenshot",
+        description: null,
+        metadata: {
+          pageTitle: "Resolved Ticket",
+          currentUrl: "http://127.0.0.1:3000/internal/helpdesk/tickets/hd-1002",
+        },
       },
     ],
     toolActions: [
@@ -535,8 +572,8 @@ describe("run detail timeline UI", () => {
       screen.getByRole("heading", { name: "Audit: approval_requested" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Artifact attached: screenshot" }),
-    ).toBeInTheDocument();
+      screen.getAllByRole("heading", { name: "Artifact attached: screenshot" }),
+    ).toHaveLength(2);
     expect(
       screen.getByRole("heading", { name: "Run succeeded" }),
     ).toBeInTheDocument();
@@ -550,5 +587,38 @@ describe("run detail timeline UI", () => {
     expect(screen.getByText(/audit evidence/i)).toBeInTheDocument();
     expect(screen.getByText(/account recovery screenshot/i)).toBeInTheDocument();
     expect(screen.getByText("artifact_001")).toBeInTheDocument();
+  });
+});
+
+describe("artifact viewer UI", () => {
+  it("renders an empty state when no artifacts are attached", () => {
+    const replay = makeReplay();
+    render(
+      <RunArtifactViewer
+        replay={{ ...replay, artifacts: [], timelineEntries: replay.timelineEntries.filter((entry) => entry.kind !== "artifact") }}
+      />,
+    );
+
+    expect(screen.getByText(/no artifacts attached/i)).toBeInTheDocument();
+  });
+
+  it("renders artifact metadata and switches selected screenshots", () => {
+    render(<RunArtifactViewer replay={makeReplay()} />);
+
+    expect(screen.getByText(/selected artifact/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Account recovery screenshot" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/helpdesk queue/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /resolved ticket screenshot/i }));
+
+    expect(
+      screen.getByRole("heading", { name: "Resolved ticket screenshot" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/resolved ticket/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("http://127.0.0.1:3000/internal/helpdesk/tickets/hd-1002"),
+    ).toBeInTheDocument();
   });
 });
