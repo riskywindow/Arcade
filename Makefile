@@ -4,7 +4,7 @@ UV_CACHE_DIR ?= /tmp/uv-cache
 COREPACK_HOME ?= /tmp/corepack
 COMPOSE_FILE := infra/docker-compose.yml
 
-.PHONY: help setup infra-up infra-down dev api-dev worker-dev console-dev smoke test lint typecheck format db-migrate db-rollback phase2-demo phase2-demo-reset phase4-demo phase4-demo-reset phase5-demo phase5-demo-reset
+.PHONY: help setup infra-up infra-down dev api-dev worker-dev console-dev smoke test lint typecheck format db-migrate db-rollback phase2-demo phase2-demo-reset phase4-demo phase4-demo-reset phase5-demo phase5-demo-reset phase6-benchmark phase6-benchmark-reset
 
 help:
 	@echo "Available commands:"
@@ -24,6 +24,8 @@ help:
 	@echo "  make phase4-demo-reset Reset the DB, then run the seeded Phase 4 agent demo"
 	@echo "  make phase5-demo Run the seeded Phase 5 policy-protected demo"
 	@echo "  make phase5-demo-reset Reset the DB, then run the seeded Phase 5 policy-protected demo"
+	@echo "  make phase6-benchmark Run the deterministic Phase 6 benchmark fixture flow"
+	@echo "  make phase6-benchmark-reset Reset the DB, then run the deterministic Phase 6 benchmark fixture flow"
 	@echo "  make test       Run Python and frontend tests"
 	@echo "  make lint       Run Python and frontend lint checks"
 	@echo "  make typecheck  Run Python and frontend type checks"
@@ -68,6 +70,12 @@ phase5-demo:
 
 phase5-demo-reset:
 	RUN_ID=$${RUN_ID:-phase5-policy-demo-001} RESET_DB=1 UV_CACHE_DIR=$(UV_CACHE_DIR) zsh infra/scripts/phase5_policy_demo.sh
+
+phase6-benchmark:
+	UV_CACHE_DIR=$(UV_CACHE_DIR) zsh infra/scripts/phase6_benchmark_demo.sh
+
+phase6-benchmark-reset:
+	RESET_DB=1 UV_CACHE_DIR=$(UV_CACHE_DIR) zsh infra/scripts/phase6_benchmark_demo.sh
 
 test:
 	UV_CACHE_DIR=$(UV_CACHE_DIR) uv run pytest

@@ -61,6 +61,15 @@ Phase 6 benchmark runner:
 uv run atlas-worker benchmark-run --catalog-id helpdesk-v0 --benchmark-run-id benchmark-helpdesk-v0-001
 ```
 
+Phase 6 benchmark fixture and sample report:
+```bash
+uv run atlas-worker benchmark-fixture \
+  --catalog-id helpdesk-v0 \
+  --baseline-benchmark-run-id benchmark-helpdesk-v0-baseline \
+  --candidate-benchmark-run-id benchmark-helpdesk-v0-regressed \
+  --sample-report-path docs/demos/phase6-benchmark-sample-report.md
+```
+
 One-command local demo reset:
 ```bash
 make phase4-demo-reset
@@ -69,6 +78,11 @@ make phase4-demo-reset
 One-command policy-protected demo reset:
 ```bash
 make phase5-demo-reset
+```
+
+One-command benchmark fixture reset:
+```bash
+make phase6-benchmark-reset
 ```
 
 Historical dummy-run reset:

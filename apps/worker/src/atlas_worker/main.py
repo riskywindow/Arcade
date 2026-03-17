@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import argparse
 
+from atlas_worker.benchmark_fixture import (
+    DEFAULT_BASELINE_BENCHMARK_RUN_ID,
+    DEFAULT_CANDIDATE_BENCHMARK_RUN_ID,
+    DEFAULT_SAMPLE_REPORT_PATH,
+    execute_benchmark_fixture_from_config,
+)
 from atlas_worker.benchmark_runner import execute_benchmark_catalog_from_config
 from atlas_worker.dummy_execution import DummyRunSpec, execute_dummy_run_from_config
 from atlas_worker.agent_execution import (
@@ -52,6 +58,7 @@ def main() -> None:
             "agent-demo",
             "policy-demo",
             "benchmark-run",
+            "benchmark-fixture",
         ),
         help="worker action to run",
     )
@@ -85,6 +92,21 @@ def main() -> None:
         "--benchmark-run-id",
         default="benchmark-helpdesk-v0-001",
         help="stable benchmark execution id used to derive persisted run ids",
+    )
+    parser.add_argument(
+        "--baseline-benchmark-run-id",
+        default=DEFAULT_BASELINE_BENCHMARK_RUN_ID,
+        help="benchmark run id for the saved baseline fixture",
+    )
+    parser.add_argument(
+        "--candidate-benchmark-run-id",
+        default=DEFAULT_CANDIDATE_BENCHMARK_RUN_ID,
+        help="benchmark run id for the saved candidate fixture",
+    )
+    parser.add_argument(
+        "--sample-report-path",
+        default=str(DEFAULT_SAMPLE_REPORT_PATH),
+        help="markdown path written for the deterministic sample benchmark report",
     )
     parser.add_argument(
         "--browser-mode",
@@ -212,6 +234,29 @@ def main() -> None:
                     }
                     for item in benchmark_result.items
                 ],
+            }
+        )
+        return
+
+    if args.command == "benchmark-fixture":
+        fixture_result = execute_benchmark_fixture_from_config(
+            config,
+            catalog_id=args.catalog_id,
+            baseline_benchmark_run_id=args.baseline_benchmark_run_id,
+            candidate_benchmark_run_id=args.candidate_benchmark_run_id,
+            sample_report_path=args.sample_report_path,
+            schema_name=args.schema_name,
+        )
+        print(
+            {
+                "catalog_id": fixture_result.catalog_id,
+                "baseline_benchmark_run_id": fixture_result.baseline.benchmark_run_id,
+                "candidate_benchmark_run_id": fixture_result.candidate.benchmark_run_id,
+                "comparison_outcome": fixture_result.comparison.outcome.value,
+                "passed_runs": fixture_result.candidate.aggregate.passed_runs,
+                "failed_runs": fixture_result.candidate.aggregate.failed_runs,
+                "average_score": fixture_result.candidate.aggregate.average_score,
+                "sample_report_path": fixture_result.sample_report_path,
             }
         )
         return
