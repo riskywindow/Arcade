@@ -32,7 +32,7 @@ const navItems: ConsoleNavItem[] = [
   {
     href: "/runs",
     label: "Runs",
-    description: "Future run list and replay entrypoint.",
+    description: "Operator dashboard, run list, and replay entrypoint.",
   },
   {
     href: "/scenarios",

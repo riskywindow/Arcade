@@ -5,6 +5,9 @@ import type {
   ApprovalResponse,
   Run,
   RunListResponse,
+  RunReplay,
+  RunReplayResponse,
+  RunResponse,
   StopRunRequest,
   StopRunResponse,
 } from "@atlas/shared-types";
@@ -35,6 +38,44 @@ export async function getRuns(
 
   const payload = (await response.json()) as RunListResponse;
   return payload.runs;
+}
+
+export async function getRun(
+  runId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Run> {
+  const response = await fetchImpl(`${apiBaseUrl}/runs/${runId}`, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`failed to load run ${runId}: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as RunResponse;
+  return payload.run;
+}
+
+export async function getRunReplay(
+  runId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RunReplay> {
+  const response = await fetchImpl(`${apiBaseUrl}/runs/${runId}/replay`, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`failed to load replay for ${runId}: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as RunReplayResponse;
+  return payload.replay;
 }
 
 export async function getRunApprovals(

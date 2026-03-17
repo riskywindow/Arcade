@@ -11,8 +11,9 @@ Current scope:
 - seeded internal inbox routes under `/internal/inbox`,
 - seeded internal wiki routes under `/internal/wiki`,
 - typed imports from `@atlas/shared-types`,
-- minimal `/runs` approval and kill-switch operator panels backed by the local API,
-- no replay timeline UI yet.
+- `/runs` operator dashboard with run filtering, demo-run discovery, and a minimal run detail route,
+- approval and kill-switch operator panels backed by the local API,
+- no rich replay timeline UI yet.
 
 Local run:
 
@@ -22,7 +23,7 @@ pnpm --filter @atlas/console dev
 
 Future replay UI insertion points:
 
-- `app/runs/` for run list and run detail routes
+- `app/runs/` for richer run detail and replay routes
 - `components/` for replay panels and event timeline primitives
 - `lib/api/` for typed console-to-API boundaries
 
