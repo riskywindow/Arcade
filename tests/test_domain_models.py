@@ -38,6 +38,7 @@ from atlas_core import (
     ToolCall,
     ToolCallRecordedPayload,
     ToolCallStatus,
+    build_run_replay,
 )
 
 
@@ -318,3 +319,90 @@ def test_artifact_rejects_negative_size() -> None:
             created_at=_timestamp(),
             size_bytes=-1,
         )
+
+
+def test_run_replay_projection_round_trips_through_json() -> None:
+    run = _run()
+    tool_call = ToolCall(
+        tool_call_id="tool_001",
+        tool_name="identity_api",
+        action="lookup_account",
+        arguments={"employee_id": "emp_123"},
+        status=ToolCallStatus.SUCCEEDED,
+        result={"artifactIds": ["artifact_001"]},
+    )
+    events = [
+        RunEvent(
+            event_id="evt_created",
+            run_id=run.run_id,
+            sequence=0,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.RUN_CREATED,
+            payload=RunCreatedPayload(
+                event_type=RunEventType.RUN_CREATED,
+                run=run,
+            ),
+        ),
+        RunEvent(
+            event_id="evt_tool",
+            run_id=run.run_id,
+            sequence=1,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            correlation_id="req_123",
+            event_type=RunEventType.TOOL_CALL_RECORDED,
+            payload=ToolCallRecordedPayload(
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                run_id=run.run_id,
+                step_id="step_001",
+                tool_call=tool_call,
+                policy_decision=PolicyDecision(
+                    decision_id="policy_001",
+                    outcome=PolicyDecisionOutcome.ALLOW,
+                    action_type="identity.lookup",
+                    rationale="Read-only lookup is allowed.",
+                ),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_completed",
+            run_id=run.run_id,
+            sequence=2,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.RUN_COMPLETED,
+            payload=RunCompletedPayload(
+                event_type=RunEventType.RUN_COMPLETED,
+                run_id=run.run_id,
+                final_status=RunStatus.SUCCEEDED,
+                completed_at=_timestamp(),
+                grade_result=GradeResult(
+                    outcome=GradeOutcome.PASSED,
+                    score=1.0,
+                    summary="Scenario passed.",
+                ),
+            ),
+        ),
+    ]
+    artifact = Artifact(
+        artifact_id="artifact_001",
+        run_id=run.run_id,
+        step_id="step_001",
+        kind=ArtifactKind.SCREENSHOT,
+        uri="minio://atlas-artifacts/run_123/screenshot.png",
+        content_type="image/png",
+        created_at=_timestamp(),
+        metadata={"source": "browser"},
+    )
+
+    replay = build_run_replay(run, events, [artifact])
+    serialized = replay.model_dump(mode="json")
+
+    assert serialized["raw_event_count"] == 3
+    assert serialized["tool_actions"][0]["artifact_ids"] == ["artifact_001"]
+    assert serialized["policy_decisions"][0]["decision"]["outcome"] == "allow"
+    assert serialized["outcome"]["final_status"] == "succeeded"

@@ -17,12 +17,16 @@ from atlas_core import (
     ApprovalRequestedPayload,
     ApprovalRequestRef,
     ApprovalRequestStatus,
+    ApprovalResolvedPayload,
     AuditEventKind,
     AuditRecordedPayload,
     Artifact,
+    ArtifactAttachedPayload,
     ArtifactKind,
     DEFAULT_MIGRATIONS_DIR,
     EnvironmentRef,
+    PolicyDecision,
+    PolicyDecisionOutcome,
     Run,
     RunCompletedPayload,
     RunCreatedPayload,
@@ -31,6 +35,7 @@ from atlas_core import (
     RunEventType,
     RunReadyPayload,
     RunRepository,
+    RunResumedPayload,
     RunWaitingApprovalPayload,
     RunService,
     RunStartedPayload,
@@ -266,6 +271,274 @@ def test_run_api_create_list_get_and_events(api_client: TestClient) -> None:
         "run.started",
         "tool_call.recorded",
     ]
+
+
+def test_run_replay_endpoint_returns_grouped_run_detail(api_client: TestClient) -> None:
+    create_response = api_client.post(
+        "/runs",
+        json={
+            "environment": {
+                "environmentId": "env_helpdesk",
+                "environmentName": "Northstar Helpdesk",
+                "environmentVersion": "v1",
+            },
+            "scenario": {
+                "scenarioId": "scn_123",
+                "environmentId": "env_helpdesk",
+                "scenarioName": "travel-lockout",
+                "scenarioSeed": "seed-123",
+            },
+            "task": {
+                "taskId": "task_123",
+                "scenarioId": "scn_123",
+                "taskKind": "access_restoration",
+                "taskTitle": "Restore employee access after travel lockout",
+            },
+            "activeAgentId": "dummy-agent",
+        },
+    )
+    assert create_response.status_code == 201
+    run_id = create_response.json()["run"]["runId"]
+
+    schema_name = cast(Any, api_client.app).state.database_schema
+    service, service_conn = _run_service(schema_name)
+    try:
+        run = service.get_run(run_id)
+        service.append_run_event(_event(run, RunEventType.RUN_CREATED, 0))
+        service.append_run_event(_event(run, RunEventType.RUN_READY, 1))
+        service.append_run_event(_event(run, RunEventType.RUN_STARTED, 2))
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_step",
+                run_id=run_id,
+                sequence=3,
+                occurred_at=_timestamp(),
+                source=RunEventSource.AGENT,
+                actor_type=ActorType.AGENT,
+                correlation_id="step_001",
+                event_type=RunEventType.RUN_STEP_CREATED,
+                payload=RunStepCreatedPayload(
+                    event_type=RunEventType.RUN_STEP_CREATED,
+                    run_id=run_id,
+                    step={
+                        "step_id": "step_001",
+                        "run_id": run_id,
+                        "step_index": 1,
+                        "title": "Inspect account state",
+                        "status": "completed",
+                        "started_at": _timestamp().isoformat(),
+                        "completed_at": _timestamp().isoformat(),
+                    },
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_tool",
+                run_id=run_id,
+                sequence=4,
+                occurred_at=_timestamp(),
+                source=RunEventSource.WORKER,
+                actor_type=ActorType.WORKER,
+                correlation_id="req_123",
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                payload=ToolCallRecordedPayload(
+                    event_type=RunEventType.TOOL_CALL_RECORDED,
+                    run_id=run_id,
+                    step_id="step_001",
+                    tool_call=ToolCall(
+                        tool_call_id="tool_001",
+                        tool_name="identity_api",
+                        action="limited_mfa_recovery",
+                        arguments={"employee_id": "emp_123"},
+                        status=ToolCallStatus.BLOCKED,
+                        result={"artifactIds": ["artifact_001"]},
+                    ),
+                    policy_decision=PolicyDecision(
+                        decision_id="policy_001",
+                        outcome=PolicyDecisionOutcome.REQUIRE_APPROVAL,
+                        action_type="identity.limited_mfa_recovery",
+                        rationale="Sensitive account recovery requires approval.",
+                        approval_request_id="approval_001",
+                    ),
+                ),
+            )
+        )
+        approval_request = ApprovalRequestRef(
+            approval_request_id="approval_001",
+            run_id=run_id,
+            step_id="step_001",
+            status=ApprovalRequestStatus.PENDING,
+            requested_action_type="identity.limited_mfa_recovery",
+            tool_name="identity_api",
+            requested_arguments={"employee_id": "emp_123"},
+            requested_at=_timestamp(),
+            summary="Approve the limited recovery path.",
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_approval_requested",
+                run_id=run_id,
+                sequence=5,
+                occurred_at=_timestamp(),
+                source=RunEventSource.BASTION,
+                actor_type=ActorType.BASTION,
+                correlation_id="approval_001",
+                event_type=RunEventType.APPROVAL_REQUESTED,
+                payload=ApprovalRequestedPayload(
+                    event_type=RunEventType.APPROVAL_REQUESTED,
+                    run_id=run_id,
+                    approval_request=approval_request.model_dump(mode="json"),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_waiting",
+                run_id=run_id,
+                sequence=6,
+                occurred_at=_timestamp(),
+                source=RunEventSource.WORKER,
+                actor_type=ActorType.WORKER,
+                correlation_id="approval_001",
+                event_type=RunEventType.RUN_WAITING_APPROVAL,
+                payload=RunWaitingApprovalPayload(
+                    event_type=RunEventType.RUN_WAITING_APPROVAL,
+                    run_id=run_id,
+                    status=RunStatus.WAITING_APPROVAL,
+                    approval_request_id="approval_001",
+                    waiting_at=_timestamp(),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_audit",
+                run_id=run_id,
+                sequence=7,
+                occurred_at=_timestamp(),
+                source=RunEventSource.BASTION,
+                actor_type=ActorType.BASTION,
+                correlation_id="req_123",
+                event_type=RunEventType.AUDIT_RECORDED,
+                payload=AuditRecordedPayload(
+                    event_type=RunEventType.AUDIT_RECORDED,
+                    run_id=run_id,
+                    audit_record=AuditRecordEnvelope(
+                        audit_id="audit_001",
+                        run_id=run_id,
+                        step_id="step_001",
+                        request_id="req_123",
+                        actor_type=ActorType.BASTION,
+                        event_kind=AuditEventKind.APPROVAL_REQUESTED,
+                        occurred_at=_timestamp(),
+                        payload={"reasonCode": "approval_required"},
+                    ).model_dump(mode="json"),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_artifact",
+                run_id=run_id,
+                sequence=8,
+                occurred_at=_timestamp(),
+                source=RunEventSource.WORKER,
+                actor_type=ActorType.WORKER,
+                correlation_id="artifact_001",
+                event_type=RunEventType.ARTIFACT_ATTACHED,
+                payload=ArtifactAttachedPayload(
+                    event_type=RunEventType.ARTIFACT_ATTACHED,
+                    run_id=run_id,
+                    step_id="step_001",
+                    artifact=Artifact(
+                        artifact_id="artifact_001",
+                        run_id=run_id,
+                        step_id="step_001",
+                        kind=ArtifactKind.SCREENSHOT,
+                        uri="minio://atlas-artifacts/run_123/screenshot.png",
+                        content_type="image/png",
+                        created_at=_timestamp(),
+                        metadata={"source": "browser"},
+                    ),
+                ),
+            )
+        )
+        approved_request = approval_request.model_copy(
+            update={"status": ApprovalRequestStatus.APPROVED, "resolved_at": _timestamp()}
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_approval_resolved",
+                run_id=run_id,
+                sequence=9,
+                occurred_at=_timestamp(),
+                source=RunEventSource.OPERATOR,
+                actor_type=ActorType.OPERATOR,
+                correlation_id="approval_001",
+                event_type=RunEventType.APPROVAL_RESOLVED,
+                payload=ApprovalResolvedPayload(
+                    event_type=RunEventType.APPROVAL_RESOLVED,
+                    run_id=run_id,
+                    approval_request=approved_request.model_dump(mode="json"),
+                    operator_id="operator_001",
+                    decided_at=_timestamp(),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_resumed",
+                run_id=run_id,
+                sequence=10,
+                occurred_at=_timestamp(),
+                source=RunEventSource.OPERATOR,
+                actor_type=ActorType.OPERATOR,
+                correlation_id="approval_001",
+                event_type=RunEventType.RUN_RESUMED,
+                payload=RunResumedPayload(
+                    event_type=RunEventType.RUN_RESUMED,
+                    run_id=run_id,
+                    status=RunStatus.RUNNING,
+                    approval_request_id="approval_001",
+                    resumed_at=_timestamp(),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="evt_completed",
+                run_id=run_id,
+                sequence=11,
+                occurred_at=_timestamp(),
+                source=RunEventSource.WORKER,
+                actor_type=ActorType.WORKER,
+                event_type=RunEventType.RUN_COMPLETED,
+                payload=RunCompletedPayload(
+                    event_type=RunEventType.RUN_COMPLETED,
+                    run_id=run_id,
+                    final_status=RunStatus.SUCCEEDED,
+                    completed_at=_timestamp(),
+                ),
+            )
+        )
+    finally:
+        service_conn.close()
+
+    response = api_client.get(f"/runs/{run_id}/replay")
+
+    assert response.status_code == 200
+    payload = response.json()["replay"]
+    assert payload["run"]["runId"] == run_id
+    assert payload["rawEventCount"] == 12
+    assert payload["toolActions"][0]["toolCall"]["toolName"] == "identity_api"
+    assert payload["policyDecisions"][0]["decision"]["outcome"] == "require_approval"
+    assert payload["approvals"][0]["approvalRequestId"] == "approval_001"
+    assert payload["auditRecords"][0]["auditId"] == "audit_001"
+    assert payload["artifacts"][0]["artifactId"] == "artifact_001"
+    assert payload["outcome"]["finalStatus"] == "succeeded"
+    assert any(entry["kind"] == "tool_action" for entry in payload["timelineEntries"])
+    assert any(entry["kind"] == "approval" for entry in payload["timelineEntries"])
 
     artifacts_response = api_client.get(f"/runs/{run_id}/artifacts")
     assert artifacts_response.status_code == 200

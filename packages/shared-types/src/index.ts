@@ -840,6 +840,124 @@ export type RunEvent = {
   payload: RunEventPayload;
 };
 
+export type ReplayArtifactRef = {
+  artifactId: string;
+  eventId?: string | null;
+  timelineEntryId?: string | null;
+  stepId?: string | null;
+  createdAt: string;
+  kind: ArtifactKind;
+  uri: string;
+  contentType: string;
+  displayName?: string | null;
+  description?: string | null;
+  metadata: Record<string, JsonValue>;
+};
+
+export type ReplayToolAction = {
+  toolActionId: string;
+  eventId: string;
+  sequence: number;
+  occurredAt: string;
+  stepId?: string | null;
+  requestId?: string | null;
+  toolCall: ToolCall;
+  policyDecision?: PolicyDecision | null;
+  artifactIds: string[];
+};
+
+export type ReplayPolicyDecision = {
+  policyDecisionId: string;
+  eventId: string;
+  sequence: number;
+  occurredAt: string;
+  toolActionId?: string | null;
+  decision: PolicyDecision;
+};
+
+export type ReplayApproval = {
+  approvalRequestId: string;
+  request: ApprovalRequestRef;
+  requestedEventId?: string | null;
+  waitingEventId?: string | null;
+  resolvedEventId?: string | null;
+  resumedEventId?: string | null;
+  requestedAt: string;
+  waitingAt?: string | null;
+  decidedAt?: string | null;
+  resumedAt?: string | null;
+  operatorId?: string | null;
+};
+
+export type ReplayAuditRecord = {
+  auditId: string;
+  eventId: string;
+  sequence: number;
+  occurredAt: string;
+  stepId?: string | null;
+  requestId?: string | null;
+  eventKind: string;
+  actorType: ActorType;
+  payload: Record<string, JsonValue>;
+};
+
+export type ReplayOutcome = {
+  eventId?: string | null;
+  sequence?: number | null;
+  finalStatus: RunStatus;
+  completedAt?: string | null;
+  gradeResult?: GradeResult | null;
+  summary?: string | null;
+};
+
+export type ReplayTimelineEntryKind =
+  | "lifecycle"
+  | "step"
+  | "tool_action"
+  | "approval"
+  | "audit"
+  | "artifact"
+  | "outcome";
+
+export type ReplayTimelineEntryStatus =
+  | "info"
+  | "success"
+  | "warning"
+  | "failed"
+  | "blocked"
+  | "waiting";
+
+export type ReplayTimelineEntry = {
+  entryId: string;
+  eventId?: string | null;
+  sequence: number;
+  occurredAt: string;
+  kind: ReplayTimelineEntryKind;
+  status: ReplayTimelineEntryStatus;
+  title: string;
+  summary: string;
+  eventType?: string | null;
+  stepId?: string | null;
+  toolActionId?: string | null;
+  approvalRequestId?: string | null;
+  auditId?: string | null;
+  artifactId?: string | null;
+  relatedArtifactIds: string[];
+};
+
+export type RunReplay = {
+  schemaVersion: number;
+  run: Run;
+  rawEventCount: number;
+  timelineEntries: ReplayTimelineEntry[];
+  artifacts: ReplayArtifactRef[];
+  toolActions: ReplayToolAction[];
+  policyDecisions: ReplayPolicyDecision[];
+  approvals: ReplayApproval[];
+  auditRecords: ReplayAuditRecord[];
+  outcome: ReplayOutcome;
+};
+
 export type CreateRunRequest = {
   environment: EnvironmentRef;
   scenario: ScenarioRef;
@@ -858,6 +976,10 @@ export type RunListResponse = {
 export type RunEventListResponse = {
   runId: string;
   events: RunEvent[];
+};
+
+export type RunReplayResponse = {
+  replay: RunReplay;
 };
 
 export type ArtifactListResponse = {

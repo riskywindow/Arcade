@@ -34,6 +34,8 @@ from atlas_api.schemas import (
     RunEventListResponse,
     RunEventSchema,
     RunListResponse,
+    RunReplayResponse,
+    RunReplaySchema,
     RunResponse,
     RunSchema,
     StopRunRequest,
@@ -65,12 +67,14 @@ from atlas_core import (
     RunEventType,
     RunNotFoundError,
     RunRepository,
+    RunReplay,
     RunResumedPayload,
     RunStopRequestedPayload,
     ScenarioRef,
     RunService,
     RunStatus,
     TaskRef,
+    build_run_replay,
     open_run_store_connection,
 )
 from atlas_env_helpdesk import (
@@ -106,6 +110,10 @@ def _to_run_event_schema(event) -> RunEventSchema:
 
 def _to_artifact_schema(artifact) -> ArtifactSchema:
     return ArtifactSchema.model_validate(artifact.model_dump(mode="json"))
+
+
+def _to_run_replay_schema(replay: RunReplay) -> RunReplaySchema:
+    return RunReplaySchema.model_validate(replay.model_dump(mode="json"))
 
 
 def _to_approval_schema(approval: ApprovalRequestRef) -> ApprovalRequestSchema:
@@ -455,6 +463,20 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
             run_id=run_id,
             events=[_to_run_event_schema(event) for event in events],
         )
+
+    @app.get("/runs/{run_id}/replay", response_model=RunReplayResponse)
+    def get_run_replay(
+        run_id: str,
+        run_service: RunService = Depends(get_run_service),
+    ) -> RunReplayResponse:
+        try:
+            run = run_service.get_run(run_id)
+            events = run_service.list_run_events(run_id)
+            artifacts = run_service.list_run_artifacts(run_id)
+        except RunNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        replay = build_run_replay(run, events, artifacts)
+        return RunReplayResponse(replay=_to_run_replay_schema(replay))
 
     @app.get("/runs/{run_id}/audit", response_model=AuditListResponse)
     def list_run_audit(

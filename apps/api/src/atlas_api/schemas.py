@@ -291,6 +291,107 @@ class RunEventSchema(ApiModel):
     payload: RunEventPayloadSchema
 
 
+class ReplayArtifactRefSchema(ApiModel):
+    artifact_id: str
+    event_id: str | None = None
+    timeline_entry_id: str | None = None
+    step_id: str | None = None
+    created_at: datetime
+    kind: ArtifactKind
+    uri: str
+    content_type: str
+    display_name: str | None = None
+    description: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReplayToolActionSchema(ApiModel):
+    tool_action_id: str
+    event_id: str
+    sequence: int
+    occurred_at: datetime
+    step_id: str | None = None
+    request_id: str | None = None
+    tool_call: ToolCallSchema
+    policy_decision: PolicyDecisionSchema | None = None
+    artifact_ids: list[str] = Field(default_factory=list)
+
+
+class ReplayPolicyDecisionSchema(ApiModel):
+    policy_decision_id: str
+    event_id: str
+    sequence: int
+    occurred_at: datetime
+    tool_action_id: str | None = None
+    decision: PolicyDecisionSchema
+
+
+class ReplayApprovalSchema(ApiModel):
+    approval_request_id: str
+    request: ApprovalRequestSchema
+    requested_event_id: str | None = None
+    waiting_event_id: str | None = None
+    resolved_event_id: str | None = None
+    resumed_event_id: str | None = None
+    requested_at: datetime
+    waiting_at: datetime | None = None
+    decided_at: datetime | None = None
+    resumed_at: datetime | None = None
+    operator_id: str | None = None
+
+
+class ReplayAuditRecordSchema(ApiModel):
+    audit_id: str
+    event_id: str
+    sequence: int
+    occurred_at: datetime
+    step_id: str | None = None
+    request_id: str | None = None
+    event_kind: str
+    actor_type: ActorType
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReplayOutcomeSchema(ApiModel):
+    event_id: str | None = None
+    sequence: int | None = None
+    final_status: RunStatus
+    completed_at: datetime | None = None
+    grade_result: GradeResultSchema | None = None
+    summary: str | None = None
+
+
+class ReplayTimelineEntrySchema(ApiModel):
+    entry_id: str
+    event_id: str | None = None
+    sequence: int
+    occurred_at: datetime
+    kind: str
+    status: str
+    title: str
+    summary: str
+    event_type: str | None = None
+    step_id: str | None = None
+    tool_action_id: str | None = None
+    approval_request_id: str | None = None
+    audit_id: str | None = None
+    artifact_id: str | None = None
+    related_artifact_ids: list[str] = Field(default_factory=list)
+
+
+class RunReplaySchema(ApiModel):
+    schema_version: int = 1
+    run: RunSchema
+    raw_event_count: int
+    timeline_entries: list[ReplayTimelineEntrySchema] = Field(default_factory=list)
+    artifacts: list[ReplayArtifactRefSchema] = Field(default_factory=list)
+    tool_actions: list[ReplayToolActionSchema] = Field(default_factory=list)
+    policy_decisions: list[ReplayPolicyDecisionSchema] = Field(default_factory=list)
+    approvals: list[ReplayApprovalSchema] = Field(default_factory=list)
+    audit_records: list[ReplayAuditRecordSchema] = Field(default_factory=list)
+    outcome: ReplayOutcomeSchema
+
+
 class CreateRunRequest(ApiModel):
     environment: EnvironmentRefSchema
     scenario: ScenarioRefSchema
@@ -317,6 +418,10 @@ class RunListResponse(ApiModel):
 class RunEventListResponse(ApiModel):
     run_id: str
     events: list[RunEventSchema]
+
+
+class RunReplayResponse(ApiModel):
+    replay: RunReplaySchema
 
 
 class ArtifactListResponse(ApiModel):

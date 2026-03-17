@@ -100,6 +100,19 @@ from atlas_core.tools import (
 )
 from atlas_core.logging import configure_logging, log_event
 from atlas_core.package_info import PACKAGE_INFO, PackageInfo
+from atlas_core.replay import (
+    ReplayApproval,
+    ReplayArtifactRef,
+    ReplayAuditRecord,
+    ReplayOutcome,
+    ReplayPolicyDecision,
+    ReplayTimelineEntry,
+    ReplayTimelineEntryKind,
+    ReplayTimelineEntryStatus,
+    ReplayToolAction,
+    RunReplay,
+    build_run_replay,
+)
 from atlas_core.run_store import (
     ArtifactAlreadyExistsError,
     EventSequenceConflictError,
@@ -170,6 +183,15 @@ __all__ = [
     "PolicyRule",
     "PolicyRuleMatch",
     "PackageInfo",
+    "ReplayApproval",
+    "ReplayArtifactRef",
+    "ReplayAuditRecord",
+    "ReplayOutcome",
+    "ReplayPolicyDecision",
+    "ReplayTimelineEntry",
+    "ReplayTimelineEntryKind",
+    "ReplayTimelineEntryStatus",
+    "ReplayToolAction",
     "ResourceSensitivity",
     "Run",
     "RunAlreadyExistsError",
@@ -185,6 +207,7 @@ __all__ = [
     "RunResumedPayload",
     "RunStopRequestedPayload",
     "RunRepository",
+    "RunReplay",
     "RunService",
     "RunStartedPayload",
     "RunStateMachineError",
@@ -218,6 +241,7 @@ __all__ = [
     "ToolRequest",
     "ToolResult",
     "ToolResultOutcome",
+    "build_run_replay",
     "ToolSpec",
     "allowed_transitions",
     "applied_versions",

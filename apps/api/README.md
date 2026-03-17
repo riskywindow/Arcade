@@ -9,6 +9,7 @@ Current surface:
 - `GET /runs`
 - `GET /runs/{run_id}`
 - `GET /runs/{run_id}/events`
+- `GET /runs/{run_id}/replay`
 - `GET /runs/{run_id}/artifacts`
 - `GET /runs/{run_id}/audit`
 - `POST /runs/{run_id}/stop`
@@ -28,7 +29,6 @@ Ownership:
 Still deferred:
 
 - task catalog CRUD
-- replay aggregation endpoints
 - stronger separation between operator-only fixture routes and agent-reachable Bastion paths
 - polished approval UI
 
