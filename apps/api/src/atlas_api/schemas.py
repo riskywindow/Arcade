@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from atlas_core.domain import (
     ActorType,
-    AuditRecordedPayload,
     ArtifactKind,
     GradeOutcome,
     PolicyDecisionOutcome,
@@ -130,6 +129,45 @@ class GradeResultSchema(ApiModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class RunScorePolicyCountsSchema(ApiModel):
+    allow: int = 0
+    deny: int = 0
+    require_approval: int = 0
+
+
+class RunScoreApprovalCountsSchema(ApiModel):
+    total: int = 0
+    pending: int = 0
+    approved: int = 0
+    rejected: int = 0
+
+
+class RunScoreGraderSummarySchema(ApiModel):
+    rubric_version: str | None = None
+    summary: str
+    deterministic_check_count: int = 0
+    failed_check_count: int = 0
+
+
+class RunScoreSummarySchema(ApiModel):
+    schema_version: int = 1
+    run_id: str
+    scenario_id: str
+    task_id: str
+    final_status: RunStatus
+    passed: bool
+    grade_outcome: GradeOutcome
+    score: float | None = None
+    step_count: int = 0
+    tool_call_count: int = 0
+    artifact_count: int = 0
+    evidence_artifact_count: int = 0
+    duration_seconds: int | None = None
+    policy_counts: RunScorePolicyCountsSchema = Field(default_factory=RunScorePolicyCountsSchema)
+    approval_counts: RunScoreApprovalCountsSchema = Field(default_factory=RunScoreApprovalCountsSchema)
+    grader_summary: RunScoreGraderSummarySchema | None = None
+
+
 class RunSchema(ApiModel):
     run_id: str
     environment: EnvironmentRefSchema
@@ -143,6 +181,7 @@ class RunSchema(ApiModel):
     current_step_index: int
     active_agent_id: str | None = None
     grade_result: GradeResultSchema | None = None
+    score_summary: RunScoreSummarySchema | None = None
 
 
 class RunCreatedPayloadSchema(ApiModel):
@@ -407,6 +446,7 @@ class RunReplaySchema(ApiModel):
     audit_records: list[ReplayAuditRecordSchema] = Field(default_factory=list)
     outcome: ReplayOutcomeSchema
     outcome_explanation: ReplayOutcomeExplanationSchema | None = None
+    score_summary: RunScoreSummarySchema | None = None
 
 
 class CreateRunRequest(ApiModel):

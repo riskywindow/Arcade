@@ -78,6 +78,13 @@ from atlas_core.execution import (
     ToolResult,
     ToolResultOutcome,
 )
+from atlas_core.evaluation import (
+    RunScoreApprovalCounts,
+    RunScoreGraderSummary,
+    RunScorePolicyCounts,
+    RunScoreSummary,
+    build_run_score_summary,
+)
 from atlas_core.serialization import (
     deserialize_artifact,
     deserialize_run_event,
@@ -215,6 +222,10 @@ __all__ = [
     "RunStopRequestedPayload",
     "RunRepository",
     "RunReplay",
+    "RunScoreApprovalCounts",
+    "RunScoreGraderSummary",
+    "RunScorePolicyCounts",
+    "RunScoreSummary",
     "RunService",
     "RunStartedPayload",
     "RunStateMachineError",
@@ -250,6 +261,7 @@ __all__ = [
     "ToolResultOutcome",
     "build_replay_outcome_explanation",
     "build_run_replay",
+    "build_run_score_summary",
     "ToolSpec",
     "allowed_transitions",
     "applied_versions",

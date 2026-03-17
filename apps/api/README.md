@@ -25,6 +25,7 @@ Ownership:
 - HTTP request and response wiring
 - dependency assembly for `RunService`
 - transport-layer schema mapping for the API surface
+- derived score-summary attachment for run and replay read models
 - operator approval and run-stop control endpoints backed by the run-event spine
 
 Still deferred:

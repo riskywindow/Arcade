@@ -22,6 +22,7 @@ from atlas_core.domain import (
     ToolCall,
     ToolCallRecordedPayload,
 )
+from atlas_core.evaluation import RunScoreSummary, build_run_score_summary
 
 
 class ReplayTimelineEntryKind(StrEnum):
@@ -165,6 +166,7 @@ class RunReplay(AtlasModel):
     audit_records: list[ReplayAuditRecord] = Field(default_factory=list)
     outcome: ReplayOutcome
     outcome_explanation: ReplayOutcomeExplanation | None = None
+    score_summary: RunScoreSummary | None = None
 
 
 def build_run_replay(run: Run, events: list[RunEvent], artifacts: list[Artifact]) -> RunReplay:
@@ -409,6 +411,7 @@ def build_run_replay(run: Run, events: list[RunEvent], artifacts: list[Artifact]
         approvals=sorted(approvals.values(), key=lambda item: (item.requested_at, item.approval_request_id)),
         audit_records=sorted(audit_records, key=lambda item: (item.sequence, item.audit_id)),
         outcome=outcome,
+        score_summary=build_run_score_summary(run, events, artifacts),
     )
     return replay.model_copy(
         update={"outcome_explanation": build_replay_outcome_explanation(replay)}

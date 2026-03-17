@@ -70,6 +70,7 @@ from atlas_core import (
     RunNotFoundError,
     RunRepository,
     RunReplay,
+    RunScoreSummary,
     RunResumedPayload,
     RunStopRequestedPayload,
     ScenarioRef,
@@ -78,6 +79,7 @@ from atlas_core import (
     TaskRef,
     build_replay_outcome_explanation,
     build_run_replay,
+    build_run_score_summary,
     open_run_store_connection,
 )
 from atlas_env_helpdesk import (
@@ -104,8 +106,11 @@ def get_run_service(request: Request):
         conn.close()
 
 
-def _to_run_schema(run: Run) -> RunSchema:
-    return RunSchema.model_validate(run.model_dump(mode="json"))
+def _to_run_schema(run: Run, score_summary: RunScoreSummary | None = None) -> RunSchema:
+    payload = run.model_dump(mode="json")
+    if score_summary is not None:
+        payload["score_summary"] = score_summary.model_dump(mode="json")
+    return RunSchema.model_validate(payload)
 
 
 def _to_run_event_schema(event) -> RunEventSchema:
@@ -118,6 +123,18 @@ def _to_artifact_schema(artifact) -> ArtifactSchema:
 
 def _to_run_replay_schema(replay: RunReplay) -> RunReplaySchema:
     return RunReplaySchema.model_validate(replay.model_dump(mode="json"))
+
+
+def _score_summary_for_run(
+    run: Run,
+    *,
+    run_service: RunService,
+    events: list[RunEvent] | None = None,
+    artifacts: list | None = None,
+) -> RunScoreSummary:
+    run_events = events if events is not None else run_service.list_run_events(run.run_id)
+    run_artifacts = artifacts if artifacts is not None else run_service.list_run_artifacts(run.run_id)
+    return build_run_score_summary(run, run_events, run_artifacts)
 
 
 def _apply_outcome_objective(replay: RunReplay) -> RunReplay:
@@ -449,14 +466,24 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
             created = run_service.create_run(run)
         except RunAlreadyExistsError as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-        return RunResponse(run=_to_run_schema(created))
+        return RunResponse(
+            run=_to_run_schema(
+                created,
+                _score_summary_for_run(created, run_service=run_service, events=[], artifacts=[]),
+            )
+        )
 
     @app.get("/runs", response_model=RunListResponse)
     def list_runs(
         run_service: RunService = Depends(get_run_service),
     ) -> RunListResponse:
         runs = run_service.list_runs()
-        return RunListResponse(runs=[_to_run_schema(run) for run in runs])
+        return RunListResponse(
+            runs=[
+                _to_run_schema(run, _score_summary_for_run(run, run_service=run_service))
+                for run in runs
+            ]
+        )
 
     @app.get("/runs/{run_id}", response_model=RunResponse)
     def get_run(
@@ -467,7 +494,9 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
             run = run_service.get_run(run_id)
         except RunNotFoundError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        return RunResponse(run=_to_run_schema(run))
+        return RunResponse(
+            run=_to_run_schema(run, _score_summary_for_run(run, run_service=run_service))
+        )
 
     @app.get("/runs/{run_id}/events", response_model=RunEventListResponse)
     def list_run_events(

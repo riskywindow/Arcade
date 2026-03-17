@@ -538,6 +538,9 @@ def test_run_replay_endpoint_returns_grouped_run_detail(api_client: TestClient) 
     assert payload["artifacts"][0]["artifactId"] == "artifact_001"
     assert payload["outcome"]["finalStatus"] == "succeeded"
     assert payload["outcomeExplanation"]["objectiveStatus"] == "incomplete"
+    assert payload["scoreSummary"]["toolCallCount"] == 1
+    assert payload["scoreSummary"]["approvalCounts"]["approved"] == 1
+    assert payload["scoreSummary"]["policyCounts"]["requireApproval"] == 1
     assert "summary" in payload["outcomeExplanation"]
     assert any(entry["kind"] == "tool_action" for entry in payload["timelineEntries"])
     assert any(entry["kind"] == "approval" for entry in payload["timelineEntries"])

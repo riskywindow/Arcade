@@ -38,6 +38,7 @@ from atlas_core import (
     ToolCall,
     ToolCallRecordedPayload,
     ToolCallStatus,
+    build_run_score_summary,
     build_replay_outcome_explanation,
     build_run_replay,
 )
@@ -447,3 +448,249 @@ def test_replay_outcome_explanation_normalizes_state_checks() -> None:
     assert explanation.state_checks[0].label == "Ticket status updated"
     assert explanation.state_checks[1].label == "Account lock state"
     assert explanation.blockers == ["Deterministic check failed: Account lock state."]
+
+
+def test_run_score_summary_derives_comparison_fields_from_stored_evidence() -> None:
+    run = _run().model_copy(
+        update={
+            "status": RunStatus.SUCCEEDED,
+            "started_at": _timestamp(),
+            "completed_at": datetime(2026, 3, 15, 12, 5, tzinfo=UTC),
+            "grade_result": GradeResult(
+                grade_id="grade_score_001",
+                outcome=GradeOutcome.PASSED,
+                score=0.9,
+                summary="Scenario passed with one denied shortcut before recovery.",
+                rubric_version="phase3-helpdesk-v1",
+                evidence_artifact_ids=["artifact_001"],
+                details={
+                    "checks": [
+                        {"name": "ticket_status", "passed": True},
+                        {"name": "approval_actions", "passed": True},
+                        {"name": "forbidden_actions", "passed": True},
+                    ],
+                    "failedChecks": [],
+                    "hiddenOwner": "atlas-hidden",
+                },
+            ),
+        }
+    )
+    approval_requested = {
+        "approval_request_id": "approval_001",
+        "run_id": run.run_id,
+        "step_id": "step_001",
+        "status": "pending",
+        "requested_action_type": "identity.limited_mfa_recovery",
+        "requested_at": _timestamp().isoformat(),
+    }
+    approval_resolved = {
+        **approval_requested,
+        "status": "approved",
+        "resolved_at": datetime(2026, 3, 15, 12, 2, tzinfo=UTC).isoformat(),
+    }
+    events = [
+        RunEvent(
+            event_id="evt_started",
+            run_id=run.run_id,
+            sequence=0,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.RUN_STARTED,
+            payload=RunStartedPayload(
+                event_type=RunEventType.RUN_STARTED,
+                run_id=run.run_id,
+                status=RunStatus.RUNNING,
+                started_at=_timestamp(),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_step",
+            run_id=run.run_id,
+            sequence=1,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.RUN_STEP_CREATED,
+            payload=RunStepCreatedPayload(
+                event_type=RunEventType.RUN_STEP_CREATED,
+                run_id=run.run_id,
+                step=RunStep(
+                    step_id="step_001",
+                    run_id=run.run_id,
+                    step_index=1,
+                    title="Inspect account state",
+                    status=RunStepStatus.COMPLETED,
+                ),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_tool_allow",
+            run_id=run.run_id,
+            sequence=2,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.TOOL_CALL_RECORDED,
+            payload=ToolCallRecordedPayload(
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                run_id=run.run_id,
+                step_id="step_001",
+                tool_call=ToolCall(
+                    tool_call_id="tool_allow",
+                    tool_name="directory_lookup",
+                    action="get_employee_detail",
+                    arguments={"employee_id": "emp_123"},
+                    status=ToolCallStatus.SUCCEEDED,
+                ),
+                policy_decision=PolicyDecision(
+                    decision_id="policy_allow",
+                    outcome=PolicyDecisionOutcome.ALLOW,
+                    action_type="directory.get_employee_detail",
+                    rationale="Read-only access is allowed.",
+                ),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_tool_deny",
+            run_id=run.run_id,
+            sequence=3,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.TOOL_CALL_RECORDED,
+            payload=ToolCallRecordedPayload(
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                run_id=run.run_id,
+                step_id="step_001",
+                tool_call=ToolCall(
+                    tool_call_id="tool_deny",
+                    tool_name="identity_api",
+                    action="disable_mfa",
+                    arguments={"employee_id": "emp_123"},
+                    status=ToolCallStatus.BLOCKED,
+                ),
+                policy_decision=PolicyDecision(
+                    decision_id="policy_deny",
+                    outcome=PolicyDecisionOutcome.DENY,
+                    action_type="identity.disable_mfa",
+                    rationale="Broad MFA disable is forbidden.",
+                ),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_tool_approval",
+            run_id=run.run_id,
+            sequence=4,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.TOOL_CALL_RECORDED,
+            payload=ToolCallRecordedPayload(
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                run_id=run.run_id,
+                step_id="step_001",
+                tool_call=ToolCall(
+                    tool_call_id="tool_approval",
+                    tool_name="identity_api",
+                    action="limited_mfa_recovery",
+                    arguments={"employee_id": "emp_123"},
+                    status=ToolCallStatus.BLOCKED,
+                ),
+                policy_decision=PolicyDecision(
+                    decision_id="policy_approval",
+                    outcome=PolicyDecisionOutcome.REQUIRE_APPROVAL,
+                    action_type="identity.limited_mfa_recovery",
+                    rationale="Sensitive recovery needs approval.",
+                    approval_request_id="approval_001",
+                ),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_approval_requested",
+            run_id=run.run_id,
+            sequence=5,
+            occurred_at=_timestamp(),
+            source=RunEventSource.BASTION,
+            actor_type=ActorType.BASTION,
+            event_type=RunEventType.APPROVAL_REQUESTED,
+            payload=ApprovalRequestedPayload(
+                event_type=RunEventType.APPROVAL_REQUESTED,
+                run_id=run.run_id,
+                approval_request=approval_requested,
+            ),
+        ),
+        RunEvent(
+            event_id="evt_approval_resolved",
+            run_id=run.run_id,
+            sequence=6,
+            occurred_at=_timestamp(),
+            source=RunEventSource.OPERATOR,
+            actor_type=ActorType.OPERATOR,
+            event_type=RunEventType.APPROVAL_RESOLVED,
+            payload=ApprovalResolvedPayload(
+                event_type=RunEventType.APPROVAL_RESOLVED,
+                run_id=run.run_id,
+                approval_request=approval_resolved,
+                operator_id="operator_001",
+                decided_at=datetime(2026, 3, 15, 12, 2, tzinfo=UTC),
+            ),
+        ),
+        RunEvent(
+            event_id="evt_completed",
+            run_id=run.run_id,
+            sequence=7,
+            occurred_at=datetime(2026, 3, 15, 12, 5, tzinfo=UTC),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.RUN_COMPLETED,
+            payload=RunCompletedPayload(
+                event_type=RunEventType.RUN_COMPLETED,
+                run_id=run.run_id,
+                final_status=RunStatus.SUCCEEDED,
+                completed_at=datetime(2026, 3, 15, 12, 5, tzinfo=UTC),
+                grade_result=run.grade_result,
+            ),
+        ),
+    ]
+    artifacts = [
+        Artifact(
+            artifact_id="artifact_001",
+            run_id=run.run_id,
+            step_id="step_001",
+            kind=ArtifactKind.SCREENSHOT,
+            uri="minio://atlas-artifacts/run_123/screenshot.png",
+            content_type="image/png",
+            created_at=_timestamp(),
+        ),
+        Artifact(
+            artifact_id="artifact_002",
+            run_id=run.run_id,
+            step_id="step_001",
+            kind=ArtifactKind.LOG,
+            uri="minio://atlas-artifacts/run_123/log.json",
+            content_type="application/json",
+            created_at=_timestamp(),
+        ),
+    ]
+
+    summary = build_run_score_summary(run, events, artifacts)
+
+    assert summary.run_id == run.run_id
+    assert summary.passed is True
+    assert summary.grade_outcome == "passed"
+    assert summary.step_count == 1
+    assert summary.tool_call_count == 3
+    assert summary.artifact_count == 2
+    assert summary.evidence_artifact_count == 1
+    assert summary.duration_seconds == 300
+    assert summary.policy_counts.allow == 1
+    assert summary.policy_counts.deny == 1
+    assert summary.policy_counts.require_approval == 1
+    assert summary.approval_counts.total == 1
+    assert summary.approval_counts.pending == 0
+    assert summary.approval_counts.approved == 1
+    assert summary.approval_counts.rejected == 0
+    assert summary.grader_summary is not None
+    assert summary.grader_summary.deterministic_check_count == 3
+    assert summary.grader_summary.failed_check_count == 0

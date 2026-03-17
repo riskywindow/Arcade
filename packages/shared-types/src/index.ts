@@ -692,6 +692,45 @@ export type GradeResult = {
   details: Record<string, JsonValue>;
 };
 
+export type RunScorePolicyCounts = {
+  allow: number;
+  deny: number;
+  requireApproval: number;
+};
+
+export type RunScoreApprovalCounts = {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+};
+
+export type RunScoreGraderSummary = {
+  rubricVersion?: string | null;
+  summary: string;
+  deterministicCheckCount: number;
+  failedCheckCount: number;
+};
+
+export type RunScoreSummary = {
+  schemaVersion: number;
+  runId: string;
+  scenarioId: string;
+  taskId: string;
+  finalStatus: RunStatus;
+  passed: boolean;
+  gradeOutcome: GradeOutcome;
+  score?: number | null;
+  stepCount: number;
+  toolCallCount: number;
+  artifactCount: number;
+  evidenceArtifactCount: number;
+  durationSeconds?: number | null;
+  policyCounts: RunScorePolicyCounts;
+  approvalCounts: RunScoreApprovalCounts;
+  graderSummary?: RunScoreGraderSummary | null;
+};
+
 export type Run = {
   runId: string;
   environment: EnvironmentRef;
@@ -705,6 +744,7 @@ export type Run = {
   currentStepIndex: number;
   activeAgentId?: string | null;
   gradeResult?: GradeResult | null;
+  scoreSummary?: RunScoreSummary | null;
 };
 
 export type RunCreatedPayload = {
@@ -975,6 +1015,7 @@ export type RunReplay = {
   auditRecords: ReplayAuditRecord[];
   outcome: ReplayOutcome;
   outcomeExplanation?: ReplayOutcomeExplanation | null;
+  scoreSummary?: RunScoreSummary | null;
 };
 
 export type CreateRunRequest = {
