@@ -5,7 +5,15 @@ import React, { useMemo, useState, type CSSProperties } from "react";
 
 import type { Run } from "@atlas/shared-types";
 
-import { deriveRunType, formatTimestamp, runDateKey, runTypeLabel } from "@/lib/runs";
+import {
+  deriveRunType,
+  formatTimestamp,
+  isFlagshipDemoRun,
+  runDateKey,
+  runTypeLabel,
+  selectAttentionDemoRun,
+  selectPrimaryDemoRun,
+} from "@/lib/runs";
 
 type RunDashboardProps = {
   runs: Run[];
@@ -86,12 +94,10 @@ export function RunDashboard({ runs }: RunDashboardProps) {
     });
   }, [filters, runs]);
 
-  const flagshipRun = useMemo(
-    () =>
-      runs.find((run) => deriveRunType(run) === "seeded_demo") ??
-      runs[0] ??
-      null,
-    [runs],
+  const primaryDemoRun = useMemo(() => selectPrimaryDemoRun(runs), [runs]);
+  const attentionDemoRun = useMemo(
+    () => selectAttentionDemoRun(runs, primaryDemoRun?.runId ?? null),
+    [runs, primaryDemoRun],
   );
 
   const counts = useMemo(
@@ -143,21 +149,48 @@ export function RunDashboard({ runs }: RunDashboardProps) {
         </article>
       </section>
 
-      {flagshipRun ? (
-        <article style={styles.featuredCard}>
+      <section style={styles.curatedGrid} aria-label="Curated demo runs">
+        {primaryDemoRun ? (
+          <article style={styles.featuredCard}>
+            <div>
+              <p style={styles.kicker}>Flagship Replay</p>
+              <h3 style={styles.featuredTitle}>{primaryDemoRun.task.taskTitle}</h3>
+              <p style={styles.featuredCopy}>
+                Start here for the clean operator story: dashboard, replay timeline,
+                Bastion decisions, screenshots, and final outcome explanation.
+              </p>
+              <p style={styles.featuredMeta}>
+                {primaryDemoRun.scenario.scenarioName} · {primaryDemoRun.runId} ·{" "}
+                {primaryDemoRun.status}
+              </p>
+            </div>
+            <Link href={`/runs/${primaryDemoRun.runId}`} style={styles.primaryLink}>
+              Open flagship replay
+            </Link>
+          </article>
+        ) : null}
+
+        <article style={styles.secondaryFeaturedCard}>
           <div>
-            <p style={styles.kicker}>Recommended Demo Path</p>
-            <h3 style={styles.featuredTitle}>{flagshipRun.task.taskTitle}</h3>
+            <p style={styles.kicker}>Operator Script</p>
+            <h3 style={styles.featuredTitle}>Use the same path every time</h3>
             <p style={styles.featuredCopy}>
-              {flagshipRun.scenario.scenarioName} · {flagshipRun.runId} ·{" "}
-              {runTypeLabel(deriveRunType(flagshipRun))}
+              Open the flagship replay first, then use the approvals panel or the
+              alternate run below to explain waiting, blocked, or interrupted behavior.
+            </p>
+            <p style={styles.featuredMeta}>
+              Detailed steps live in <code style={styles.inlineCode}>docs/demos/phase6-operator-replay-demo.md</code>.
             </p>
           </div>
-          <Link href={`/runs/${flagshipRun.runId}`} style={styles.primaryLink}>
-            Open run detail
-          </Link>
+          {attentionDemoRun ? (
+            <Link href={`/runs/${attentionDemoRun.runId}`} style={styles.secondaryLink}>
+              Open approval or attention run
+            </Link>
+          ) : (
+            <span style={styles.secondaryPill}>No paused or failed demo run recorded</span>
+          )}
         </article>
-      ) : null}
+      </section>
 
       <section style={styles.filterPanel} aria-label="Run filters">
         <label style={styles.field}>
@@ -278,6 +311,9 @@ export function RunDashboard({ runs }: RunDashboardProps) {
                         <Link href={`/runs/${run.runId}`} style={styles.runLink}>
                           {run.runId}
                         </Link>
+                        {isFlagshipDemoRun(run) ? (
+                          <span style={styles.flagshipPill}>Flagship</span>
+                        ) : null}
                         <span style={styles.runMeta}>
                           {run.activeAgentId ?? "unassigned"}
                         </span>
@@ -403,6 +439,16 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid #c9d7cf",
     background: "linear-gradient(135deg, #eef7f0, #fffdf8)",
   },
+  secondaryFeaturedCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "16px",
+    alignItems: "center",
+    padding: "18px 20px",
+    borderRadius: "18px",
+    border: "1px solid #ddd5c4",
+    background: "linear-gradient(135deg, #fffcf4, #fffaf0)",
+  },
   featuredTitle: {
     margin: 0,
     fontSize: "1.2rem",
@@ -410,6 +456,11 @@ const styles: Record<string, CSSProperties> = {
   featuredCopy: {
     margin: "8px 0 0",
     color: "var(--muted)",
+  },
+  featuredMeta: {
+    margin: "10px 0 0",
+    color: "var(--muted)",
+    lineHeight: 1.5,
   },
   primaryLink: {
     display: "inline-flex",
@@ -421,6 +472,27 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid #1f5f4a",
     background: "#1f5f4a",
     color: "#fff",
+  },
+  secondaryLink: {
+    display: "inline-flex",
+    whiteSpace: "nowrap",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "10px 14px",
+    borderRadius: "999px",
+    border: "1px solid var(--border)",
+    background: "#fff",
+    color: "#1f5f4a",
+  },
+  secondaryPill: {
+    ...basePill,
+    background: "#f7f4ec",
+    whiteSpace: "nowrap",
+  },
+  curatedGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gap: "14px",
   },
   filterPanel: {
     display: "grid",
@@ -497,11 +569,21 @@ const styles: Record<string, CSSProperties> = {
     color: "var(--muted)",
     fontSize: "0.84rem",
   },
+  flagshipPill: {
+    ...basePill,
+    width: "fit-content",
+    background: "#eef7f0",
+    borderColor: "#9bc5ad",
+    color: "#1f5f4a",
+  },
   typePill: {
     ...basePill,
     background: "#f7f1e2",
     borderColor: "#ddcfaa",
     color: "#6b5a1b",
+  },
+  inlineCode: {
+    fontSize: "0.85rem",
   },
   emptyState: {
     padding: "14px 2px",

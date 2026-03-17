@@ -451,7 +451,7 @@ describe("runs dashboard UI", () => {
     expect(screen.getByText(/no runs recorded yet/i)).toBeInTheDocument();
   });
 
-  it("renders a populated run list with flagship demo entry and detail links", () => {
+  it("renders curated demo cards with flagship and attention paths", () => {
     render(
       <RunDashboard
         runs={[
@@ -470,6 +470,22 @@ describe("runs dashboard UI", () => {
               taskTitle: "Restore employee access after travel lockout",
             },
             status: "waiting_approval",
+          }),
+          makeRun({
+            runId: "phase5-policy-demo-approved-001",
+            scenario: {
+              scenarioId: "travel-lockout-recovery",
+              environmentId: "env_helpdesk",
+              scenarioName: "Travel Lockout Recovery",
+              scenarioSeed: "seed-phase3-demo",
+            },
+            task: {
+              taskId: "task_demo_success",
+              scenarioId: "travel-lockout-recovery",
+              taskKind: "access_restoration",
+              taskTitle: "Restore employee access after travel lockout",
+            },
+            status: "succeeded",
           }),
           makeRun({
             runId: "benchmark-smoke-001",
@@ -491,10 +507,19 @@ describe("runs dashboard UI", () => {
       />,
     );
 
-    expect(screen.getByText(/recommended demo path/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Open run detail" }),
+      screen.getByText("Flagship Replay", { selector: "p" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Operator Script", { selector: "p" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Open flagship replay" }),
     ).toHaveAttribute("href", "/runs/phase5-policy-demo-001");
+    expect(
+      screen.getByRole("link", { name: "Open approval or attention run" }),
+    ).toHaveAttribute("href", "/runs/phase5-policy-demo-approved-001");
+    expect(screen.getByText("Flagship")).toBeInTheDocument();
     expect(screen.getByText("phase5-policy-demo-001")).toBeInTheDocument();
     expect(screen.getByText("benchmark-smoke-001")).toBeInTheDocument();
   });
