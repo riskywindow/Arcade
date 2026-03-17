@@ -35,6 +35,14 @@ from atlas_core.benchmark import (
     build_benchmark_run_result,
 )
 from atlas_core.config import InfrastructureConfig, ServiceConfig
+from atlas_core.comparison import (
+    BenchmarkEntryComparison,
+    BenchmarkRunComparison,
+    ComparisonOutcome,
+    RunScoreComparison,
+    compare_benchmark_runs,
+    compare_run_scores,
+)
 from atlas_core.db import (
     DEFAULT_MIGRATIONS_DIR,
     MigrationFile,
@@ -176,7 +184,9 @@ __all__ = [
     "AuditRecorder",
     "BenchmarkCatalog",
     "BenchmarkCatalogEntry",
+    "BenchmarkEntryComparison",
     "BenchmarkRunAggregate",
+    "BenchmarkRunComparison",
     "BenchmarkRunItemResult",
     "BenchmarkRunResult",
     "BenchmarkRunnerKind",
@@ -190,6 +200,7 @@ __all__ = [
     "ArtifactAttachedPayload",
     "ArtifactKind",
     "CURRENT_SCHEMA_VERSION",
+    "ComparisonOutcome",
     "EnvironmentRef",
     "EventSequenceConflictError",
     "InvalidRunEventTransitionError",
@@ -240,6 +251,7 @@ __all__ = [
     "RunRepository",
     "RunReplay",
     "RunScoreApprovalCounts",
+    "RunScoreComparison",
     "RunScoreGraderSummary",
     "RunScorePolicyCounts",
     "RunScoreSummary",
@@ -282,6 +294,8 @@ __all__ = [
     "benchmark_entry_run_id",
     "build_benchmark_aggregate",
     "build_benchmark_run_result",
+    "compare_benchmark_runs",
+    "compare_run_scores",
     "ToolSpec",
     "allowed_transitions",
     "applied_versions",

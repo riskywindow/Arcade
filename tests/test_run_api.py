@@ -25,6 +25,8 @@ from atlas_core import (
     ArtifactKind,
     DEFAULT_MIGRATIONS_DIR,
     EnvironmentRef,
+    GradeOutcome,
+    GradeResult,
     PolicyDecision,
     PolicyDecisionOutcome,
     Run,
@@ -48,6 +50,7 @@ from atlas_core import (
     ToolCallRecordedPayload,
     ToolCallStatus,
     apply_migrations,
+    benchmark_entry_run_id,
     discover_migrations,
     open_run_store_connection,
 )
@@ -303,6 +306,323 @@ def test_benchmark_catalog_and_result_endpoints(api_client: TestClient) -> None:
     assert payload["aggregate"]["passedRuns"] == 2
     assert len(payload["items"]) == 2
     assert {item["runId"] for item in payload["items"]} == {item.run_id for item in result.items}
+
+
+def test_run_compare_endpoint_flags_regression(api_client: TestClient) -> None:
+    schema_name = cast(Any, api_client.app).state.database_schema
+    service, service_conn = _run_service(schema_name)
+    try:
+        baseline_run = _run("run_compare_baseline")
+        baseline_run = service.create_run(baseline_run)
+        baseline_run = RunRepository(service_conn).update_run_progress(
+            baseline_run.run_id,
+            status=RunStatus.SUCCEEDED,
+            updated_at=_timestamp().replace(minute=2),
+            started_at=_timestamp(),
+            completed_at=_timestamp().replace(minute=2),
+            grade_result=GradeResult(
+                grade_id="grade-baseline",
+                outcome=GradeOutcome.PASSED,
+                score=1.0,
+                summary="Completed successfully.",
+            ),
+        )
+        candidate_run = _run("run_compare_candidate")
+        candidate_run = service.create_run(candidate_run)
+        candidate_run = RunRepository(service_conn).update_run_progress(
+            candidate_run.run_id,
+            status=RunStatus.FAILED,
+            updated_at=_timestamp().replace(minute=4),
+            started_at=_timestamp(),
+            completed_at=_timestamp().replace(minute=4),
+            grade_result=GradeResult(
+                grade_id="grade-candidate",
+                outcome=GradeOutcome.FAILED,
+                score=0.4,
+                summary="Failed after extra approvals.",
+            ),
+        )
+        service.append_run_event(_event(baseline_run, RunEventType.RUN_STEP_CREATED, 0))
+        service.append_run_event(
+            RunEvent(
+                event_id="baseline-tool",
+                run_id=baseline_run.run_id,
+                sequence=1,
+                occurred_at=_timestamp(),
+                source=RunEventSource.AGENT,
+                actor_type=ActorType.AGENT,
+                correlation_id="baseline-tool",
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                payload=ToolCallRecordedPayload(
+                    event_type=RunEventType.TOOL_CALL_RECORDED,
+                    run_id=baseline_run.run_id,
+                    step_id=None,
+                    tool_call=ToolCall(
+                        tool_call_id="tool-baseline",
+                        tool_name="identity_api",
+                        action="reset_password",
+                        arguments={},
+                        status=ToolCallStatus.SUCCEEDED,
+                        result={"ok": True},
+                    ),
+                    policy_decision=PolicyDecision(
+                        decision_id="policy-baseline",
+                        outcome=PolicyDecisionOutcome.REQUIRE_APPROVAL,
+                        action_type="identity.reset_password",
+                        rationale="Sensitive action.",
+                        approval_request_id="approval-baseline",
+                    ),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="baseline-approval",
+                run_id=baseline_run.run_id,
+                sequence=2,
+                occurred_at=_timestamp(),
+                source=RunEventSource.BASTION,
+                actor_type=ActorType.SYSTEM,
+                correlation_id="approval-baseline",
+                event_type=RunEventType.APPROVAL_RESOLVED,
+                payload=ApprovalResolvedPayload(
+                    event_type=RunEventType.APPROVAL_RESOLVED,
+                    run_id=baseline_run.run_id,
+                    approval_request=ApprovalRequestRef(
+                        approval_request_id="approval-baseline",
+                        run_id=baseline_run.run_id,
+                        status=ApprovalRequestStatus.APPROVED,
+                        requested_action_type="identity.reset_password",
+                        requester_role="agent",
+                        requested_at=_timestamp(),
+                        resolved_at=_timestamp().replace(minute=1),
+                    ).model_dump(mode="json"),
+                    operator_id="operator-001",
+                    decided_at=_timestamp().replace(minute=1),
+                ),
+            )
+        )
+
+        service.append_run_event(_event(candidate_run, RunEventType.RUN_STEP_CREATED, 0))
+        service.append_run_event(
+            RunEvent(
+                event_id="candidate-tool-1",
+                run_id=candidate_run.run_id,
+                sequence=1,
+                occurred_at=_timestamp(),
+                source=RunEventSource.AGENT,
+                actor_type=ActorType.AGENT,
+                correlation_id="candidate-tool-1",
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                payload=ToolCallRecordedPayload(
+                    event_type=RunEventType.TOOL_CALL_RECORDED,
+                    run_id=candidate_run.run_id,
+                    step_id=None,
+                    tool_call=ToolCall(
+                        tool_call_id="tool-candidate-1",
+                        tool_name="identity_api",
+                        action="reset_password",
+                        arguments={},
+                        status=ToolCallStatus.SUCCEEDED,
+                        result={"ok": True},
+                    ),
+                    policy_decision=PolicyDecision(
+                        decision_id="policy-candidate-1",
+                        outcome=PolicyDecisionOutcome.REQUIRE_APPROVAL,
+                        action_type="identity.reset_password",
+                        rationale="Sensitive action.",
+                        approval_request_id="approval-candidate-1",
+                    ),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="candidate-tool-2",
+                run_id=candidate_run.run_id,
+                sequence=2,
+                occurred_at=_timestamp(),
+                source=RunEventSource.AGENT,
+                actor_type=ActorType.AGENT,
+                correlation_id="candidate-tool-2",
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                payload=ToolCallRecordedPayload(
+                    event_type=RunEventType.TOOL_CALL_RECORDED,
+                    run_id=candidate_run.run_id,
+                    step_id=None,
+                    tool_call=ToolCall(
+                        tool_call_id="tool-candidate-2",
+                        tool_name="identity_api",
+                        action="disable_mfa",
+                        arguments={},
+                        status=ToolCallStatus.FAILED,
+                        error_message="denied",
+                    ),
+                    policy_decision=PolicyDecision(
+                        decision_id="policy-candidate-2",
+                        outcome=PolicyDecisionOutcome.DENY,
+                        action_type="identity.disable_mfa",
+                        rationale="Unsafe shortcut.",
+                    ),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="candidate-approval-1",
+                run_id=candidate_run.run_id,
+                sequence=3,
+                occurred_at=_timestamp(),
+                source=RunEventSource.BASTION,
+                actor_type=ActorType.SYSTEM,
+                correlation_id="approval-candidate-1",
+                event_type=RunEventType.APPROVAL_RESOLVED,
+                payload=ApprovalResolvedPayload(
+                    event_type=RunEventType.APPROVAL_RESOLVED,
+                    run_id=candidate_run.run_id,
+                    approval_request=ApprovalRequestRef(
+                        approval_request_id="approval-candidate-1",
+                        run_id=candidate_run.run_id,
+                        status=ApprovalRequestStatus.APPROVED,
+                        requested_action_type="identity.reset_password",
+                        requester_role="agent",
+                        requested_at=_timestamp(),
+                        resolved_at=_timestamp().replace(minute=1),
+                    ).model_dump(mode="json"),
+                    operator_id="operator-001",
+                    decided_at=_timestamp().replace(minute=1),
+                ),
+            )
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id="candidate-approval-2",
+                run_id=candidate_run.run_id,
+                sequence=4,
+                occurred_at=_timestamp().replace(minute=2),
+                source=RunEventSource.BASTION,
+                actor_type=ActorType.SYSTEM,
+                correlation_id="approval-candidate-2",
+                event_type=RunEventType.APPROVAL_RESOLVED,
+                payload=ApprovalResolvedPayload(
+                    event_type=RunEventType.APPROVAL_RESOLVED,
+                    run_id=candidate_run.run_id,
+                    approval_request=ApprovalRequestRef(
+                        approval_request_id="approval-candidate-2",
+                        run_id=candidate_run.run_id,
+                        status=ApprovalRequestStatus.APPROVED,
+                        requested_action_type="identity.reset_password",
+                        requester_role="agent",
+                        requested_at=_timestamp().replace(minute=2),
+                        resolved_at=_timestamp().replace(minute=3),
+                    ).model_dump(mode="json"),
+                    operator_id="operator-002",
+                    decided_at=_timestamp().replace(minute=3),
+                ),
+            )
+        )
+    finally:
+        service_conn.close()
+
+    response = api_client.get(
+        "/runs/compare",
+        params={
+            "baseline_run_id": "run_compare_baseline",
+            "candidate_run_id": "run_compare_candidate",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["comparison"]
+    assert payload["outcome"] == "worse"
+    assert payload["scoreDelta"] == -0.6
+    assert payload["approvalCountDelta"] == 1
+    assert payload["deniedPolicyDelta"] == 1
+    assert "Candidate failed while baseline passed." in payload["regressions"]
+
+
+def test_benchmark_compare_endpoint_surfaces_regression(api_client: TestClient) -> None:
+    schema_name = cast(Any, api_client.app).state.database_schema
+    service, service_conn = _run_service(schema_name)
+    try:
+        execute_benchmark_catalog(
+            service,
+            catalog=get_benchmark_catalog("helpdesk-v0"),
+            benchmark_run_id="benchmark-compare-baseline",
+        )
+        execute_benchmark_catalog(
+            service,
+            catalog=get_benchmark_catalog("helpdesk-v0"),
+            benchmark_run_id="benchmark-compare-candidate",
+        )
+        degraded_run_id = benchmark_entry_run_id(
+            "benchmark-compare-candidate",
+            "travel-lockout-recovery",
+        )
+        degraded_run = service.get_run(degraded_run_id)
+        RunRepository(service_conn).update_run_progress(
+            degraded_run_id,
+            status=RunStatus.FAILED,
+            updated_at=_timestamp().replace(minute=5),
+            completed_at=degraded_run.completed_at or _timestamp().replace(minute=5),
+            grade_result=GradeResult(
+                grade_id="grade-degraded",
+                outcome=GradeOutcome.FAILED,
+                score=0.2,
+                summary="Regression example.",
+            ),
+        )
+        service.append_run_event(
+            RunEvent(
+                event_id=f"{degraded_run_id}-extra-deny",
+                run_id=degraded_run_id,
+                sequence=service.next_event_sequence(degraded_run_id),
+                occurred_at=_timestamp().replace(minute=5),
+                source=RunEventSource.BASTION,
+                actor_type=ActorType.SYSTEM,
+                correlation_id="extra-deny",
+                event_type=RunEventType.TOOL_CALL_RECORDED,
+                payload=ToolCallRecordedPayload(
+                    event_type=RunEventType.TOOL_CALL_RECORDED,
+                    run_id=degraded_run_id,
+                    step_id=None,
+                    tool_call=ToolCall(
+                        tool_call_id="tool-extra-deny",
+                        tool_name="identity_api",
+                        action="disable_mfa",
+                        arguments={},
+                        status=ToolCallStatus.FAILED,
+                        error_message="denied",
+                    ),
+                    policy_decision=PolicyDecision(
+                        decision_id="policy-extra-deny",
+                        outcome=PolicyDecisionOutcome.DENY,
+                        action_type="identity.disable_mfa",
+                        rationale="Unsafe shortcut.",
+                    ),
+                ),
+            )
+        )
+    finally:
+        service_conn.close()
+
+    response = api_client.get(
+        "/benchmarks/catalogs/helpdesk-v0/compare",
+        params={
+            "baseline_benchmark_run_id": "benchmark-compare-baseline",
+            "candidate_benchmark_run_id": "benchmark-compare-candidate",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["comparison"]
+    assert payload["outcome"] == "worse"
+    assert payload["passedRunDelta"] == -1
+    assert payload["failedRunDelta"] == 1
+    assert any(
+        item["entryId"] == "travel-lockout-recovery" and item["comparison"]["outcome"] == "worse"
+        for item in payload["itemComparisons"]
+    )
 
 
 def test_run_replay_endpoint_returns_grouped_run_detail(api_client: TestClient) -> None:

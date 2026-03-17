@@ -216,6 +216,41 @@ class BenchmarkRunResultSchema(ApiModel):
     aggregate: BenchmarkRunAggregateSchema
 
 
+class RunScoreComparisonSchema(ApiModel):
+    baseline: RunScoreSummarySchema
+    candidate: RunScoreSummarySchema
+    outcome: str
+    summary: str
+    regressions: list[str] = Field(default_factory=list)
+    improvements: list[str] = Field(default_factory=list)
+    score_delta: float | None = None
+    step_count_delta: int = 0
+    tool_call_count_delta: int = 0
+    artifact_count_delta: int = 0
+    duration_seconds_delta: int | None = None
+    approval_count_delta: int = 0
+    denied_policy_delta: int = 0
+
+
+class BenchmarkEntryComparisonSchema(ApiModel):
+    entry_id: str
+    task_title: str
+    comparison: RunScoreComparisonSchema
+
+
+class BenchmarkRunComparisonSchema(ApiModel):
+    baseline: BenchmarkRunResultSchema
+    candidate: BenchmarkRunResultSchema
+    outcome: str
+    summary: str
+    regressions: list[str] = Field(default_factory=list)
+    improvements: list[str] = Field(default_factory=list)
+    passed_run_delta: int = 0
+    failed_run_delta: int = 0
+    average_score_delta: float | None = None
+    item_comparisons: list[BenchmarkEntryComparisonSchema] = Field(default_factory=list)
+
+
 class RunSchema(ApiModel):
     run_id: str
     environment: EnvironmentRefSchema
@@ -535,6 +570,14 @@ class BenchmarkCatalogResponse(ApiModel):
 
 class BenchmarkRunResultResponse(ApiModel):
     result: BenchmarkRunResultSchema
+
+
+class RunComparisonResponse(ApiModel):
+    comparison: RunScoreComparisonSchema
+
+
+class BenchmarkRunComparisonResponse(ApiModel):
+    comparison: BenchmarkRunComparisonSchema
 
 
 class ArtifactListResponse(ApiModel):

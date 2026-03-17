@@ -781,6 +781,43 @@ export type BenchmarkRunResult = {
   aggregate: BenchmarkRunAggregate;
 };
 
+export type ComparisonOutcome = "better" | "worse" | "different" | "same";
+
+export type RunScoreComparison = {
+  baseline: RunScoreSummary;
+  candidate: RunScoreSummary;
+  outcome: ComparisonOutcome;
+  summary: string;
+  regressions: string[];
+  improvements: string[];
+  scoreDelta?: number | null;
+  stepCountDelta: number;
+  toolCallCountDelta: number;
+  artifactCountDelta: number;
+  durationSecondsDelta?: number | null;
+  approvalCountDelta: number;
+  deniedPolicyDelta: number;
+};
+
+export type BenchmarkEntryComparison = {
+  entryId: string;
+  taskTitle: string;
+  comparison: RunScoreComparison;
+};
+
+export type BenchmarkRunComparison = {
+  baseline: BenchmarkRunResult;
+  candidate: BenchmarkRunResult;
+  outcome: ComparisonOutcome;
+  summary: string;
+  regressions: string[];
+  improvements: string[];
+  passedRunDelta: number;
+  failedRunDelta: number;
+  averageScoreDelta?: number | null;
+  itemComparisons: BenchmarkEntryComparison[];
+};
+
 export type Run = {
   runId: string;
   environment: EnvironmentRef;
@@ -1098,6 +1135,14 @@ export type BenchmarkCatalogResponse = {
 
 export type BenchmarkRunResultResponse = {
   result: BenchmarkRunResult;
+};
+
+export type RunComparisonResponse = {
+  comparison: RunScoreComparison;
+};
+
+export type BenchmarkRunComparisonResponse = {
+  comparison: BenchmarkRunComparison;
 };
 
 export type ArtifactListResponse = {

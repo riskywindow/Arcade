@@ -7,8 +7,10 @@ Current surface:
 - `GET /health`
 - `GET /benchmarks/catalogs/{catalog_id}`
 - `GET /benchmarks/catalogs/{catalog_id}/runs/{benchmark_run_id}`
+- `GET /benchmarks/catalogs/{catalog_id}/compare?baseline_benchmark_run_id=...&candidate_benchmark_run_id=...`
 - `POST /runs`
 - `GET /runs`
+- `GET /runs/compare?baseline_run_id=...&candidate_run_id=...`
 - `GET /runs/{run_id}`
 - `GET /runs/{run_id}/events`
 - `GET /runs/{run_id}/replay`
@@ -28,6 +30,7 @@ Ownership:
 - dependency assembly for `RunService`
 - transport-layer schema mapping for the API surface
 - derived score-summary attachment for run and replay read models
+- additive pairwise comparison read models for runs and benchmark outputs
 - operator approval and run-stop control endpoints backed by the run-event spine
 
 Still deferred:

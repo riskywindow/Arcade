@@ -223,3 +223,19 @@ def test_shared_types_export_phase_six_benchmark_contracts() -> None:
 
     for export_name in required_exports:
         assert export_name in source
+
+
+def test_shared_types_export_phase_six_comparison_contracts() -> None:
+    source = Path("packages/shared-types/src/index.ts").read_text(encoding="utf-8")
+
+    required_exports = (
+        "export type ComparisonOutcome",
+        "export type RunScoreComparison",
+        "export type BenchmarkEntryComparison",
+        "export type BenchmarkRunComparison",
+        "export type RunComparisonResponse",
+        "export type BenchmarkRunComparisonResponse",
+    )
+
+    for export_name in required_exports:
+        assert export_name in source

@@ -13,6 +13,8 @@ from atlas_api.schemas import (
     AddTicketNoteRequest,
     BenchmarkCatalogResponse,
     BenchmarkCatalogSchema,
+    BenchmarkRunComparisonResponse,
+    BenchmarkRunComparisonSchema,
     BenchmarkRunResultResponse,
     BenchmarkRunResultSchema,
     ApprovalDecisionRequest,
@@ -37,11 +39,13 @@ from atlas_api.schemas import (
     InboxThreadListResponse,
     InboxThreadResponse,
     InboxThreadSchema,
+    RunComparisonResponse,
     RunEventListResponse,
     RunEventSchema,
     RunListResponse,
     RunReplayResponse,
     RunReplaySchema,
+    RunScoreComparisonSchema,
     RunResponse,
     RunSchema,
     StopRunRequest,
@@ -63,6 +67,7 @@ from atlas_core import (
     AuditRecordEnvelope,
     AuditRecordedPayload,
     BenchmarkCatalog,
+    BenchmarkRunComparison,
     BenchmarkRunItemResult,
     BenchmarkRunResult,
     EnvironmentRef,
@@ -77,6 +82,7 @@ from atlas_core import (
     RunNotFoundError,
     RunRepository,
     RunReplay,
+    RunScoreComparison,
     RunScoreSummary,
     RunResumedPayload,
     RunStopRequestedPayload,
@@ -90,6 +96,8 @@ from atlas_core import (
     benchmark_entry_run_id,
     build_benchmark_aggregate,
     open_run_store_connection,
+    compare_benchmark_runs,
+    compare_run_scores,
 )
 from atlas_env_helpdesk import (
     EmployeeNotFoundError,
@@ -141,6 +149,16 @@ def _to_benchmark_catalog_schema(catalog: BenchmarkCatalog) -> BenchmarkCatalogS
 
 def _to_benchmark_run_result_schema(result: BenchmarkRunResult) -> BenchmarkRunResultSchema:
     return BenchmarkRunResultSchema.model_validate(result.model_dump(mode="json"))
+
+
+def _to_run_score_comparison_schema(comparison: RunScoreComparison) -> RunScoreComparisonSchema:
+    return RunScoreComparisonSchema.model_validate(comparison.model_dump(mode="json"))
+
+
+def _to_benchmark_run_comparison_schema(
+    comparison: BenchmarkRunComparison,
+) -> BenchmarkRunComparisonSchema:
+    return BenchmarkRunComparisonSchema.model_validate(comparison.model_dump(mode="json"))
 
 
 def _score_summary_for_run(
@@ -546,6 +564,35 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         return BenchmarkRunResultResponse(result=_to_benchmark_run_result_schema(result))
 
+    @app.get(
+        "/benchmarks/catalogs/{catalog_id}/compare",
+        response_model=BenchmarkRunComparisonResponse,
+    )
+    def compare_benchmark_results(
+        catalog_id: str,
+        baseline_benchmark_run_id: str,
+        candidate_benchmark_run_id: str,
+        run_service: RunService = Depends(get_run_service),
+    ) -> BenchmarkRunComparisonResponse:
+        try:
+            catalog = _benchmark_catalog(catalog_id)
+            baseline = _benchmark_result(
+                catalog=catalog,
+                benchmark_run_id=baseline_benchmark_run_id,
+                run_service=run_service,
+            )
+            candidate = _benchmark_result(
+                catalog=catalog,
+                benchmark_run_id=candidate_benchmark_run_id,
+                run_service=run_service,
+            )
+        except (KeyError, RunNotFoundError) as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        comparison = compare_benchmark_runs(baseline, candidate)
+        return BenchmarkRunComparisonResponse(
+            comparison=_to_benchmark_run_comparison_schema(comparison)
+        )
+
     @app.post("/runs", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
     def create_run(
         payload: CreateRunRequest,
@@ -584,6 +631,23 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
                 for run in runs
             ]
         )
+
+    @app.get("/runs/compare", response_model=RunComparisonResponse)
+    def compare_runs(
+        baseline_run_id: str,
+        candidate_run_id: str,
+        run_service: RunService = Depends(get_run_service),
+    ) -> RunComparisonResponse:
+        try:
+            baseline_run = run_service.get_run(baseline_run_id)
+            candidate_run = run_service.get_run(candidate_run_id)
+        except RunNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        comparison = compare_run_scores(
+            _score_summary_for_run(baseline_run, run_service=run_service),
+            _score_summary_for_run(candidate_run, run_service=run_service),
+        )
+        return RunComparisonResponse(comparison=_to_run_score_comparison_schema(comparison))
 
     @app.get("/runs/{run_id}", response_model=RunResponse)
     def get_run(
