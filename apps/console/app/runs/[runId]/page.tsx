@@ -1,6 +1,7 @@
 import Link from "next/link";
 import React, { type CSSProperties } from "react";
 
+import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
 import { SectionCard } from "@/components/section-card";
 import { getRunReplay } from "@/lib/api/runs";
 import { deriveRunType, formatTimestamp, runTypeLabel } from "@/lib/runs";
@@ -33,6 +34,12 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
       </div>
 
       <div style={styles.grid}>
+        <SectionCard
+          title="Replay timeline"
+          description="The main replay surface groups lifecycle, tool, policy, approval, audit, artifact, and terminal outcome events from the run replay contract."
+        >
+          <RunDetailTimeline replay={replay} />
+        </SectionCard>
         <SectionCard
           title="Run summary"
           description="A compact summary of the selected run before the richer replay timeline lands."
@@ -138,8 +145,9 @@ const styles: Record<string, CSSProperties> = {
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gridTemplateColumns: "minmax(0, 1.8fr) minmax(280px, 1fr)",
     gap: "20px",
+    alignItems: "start",
   },
   metaGrid: {
     display: "grid",

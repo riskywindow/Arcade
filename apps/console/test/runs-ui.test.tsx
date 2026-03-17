@@ -2,9 +2,10 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
-import type { ApprovalRequestRef, Run } from "@atlas/shared-types";
+import type { ApprovalRequestRef, Run, RunReplay } from "@atlas/shared-types";
 
 import { ApprovalQueuePanel } from "@/components/runs/approval-queue-panel";
+import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
 import {
   RunDashboard,
   RunDashboardError,
@@ -41,6 +42,259 @@ function makeRun(overrides: Partial<Run> = {}): Run {
     activeAgentId: "agent_phase6",
     gradeResult: null,
     ...overrides,
+  };
+}
+
+function makeReplay(): RunReplay {
+  const run = makeRun({
+    runId: "phase5-policy-demo-001",
+    scenario: {
+      scenarioId: "travel-lockout-recovery",
+      environmentId: "env_helpdesk",
+      scenarioName: "Travel Lockout Recovery",
+      scenarioSeed: "seed-phase3-demo",
+    },
+    task: {
+      taskId: "task_demo",
+      scenarioId: "travel-lockout-recovery",
+      taskKind: "access_restoration",
+      taskTitle: "Restore employee access after travel lockout",
+    },
+    status: "succeeded",
+    completedAt: "2026-03-17T12:12:00Z",
+    gradeResult: {
+      outcome: "passed",
+      score: 1,
+      summary: "Scenario passed.",
+      details: {},
+      evidenceArtifactIds: ["artifact_001"],
+      gradeId: "grade_001",
+      rubricVersion: null,
+    },
+  });
+
+  return {
+    schemaVersion: 1,
+    run,
+    rawEventCount: 8,
+    timelineEntries: [
+      {
+        entryId: "timeline-evt-created",
+        eventId: "evt-created",
+        sequence: 0,
+        occurredAt: "2026-03-17T12:00:00Z",
+        kind: "lifecycle",
+        status: "info",
+        title: "Run created",
+        summary: "Created run for Restore employee access after travel lockout.",
+        eventType: "run.created",
+        stepId: null,
+        toolActionId: null,
+        approvalRequestId: null,
+        auditId: null,
+        artifactId: null,
+        relatedArtifactIds: [],
+      },
+      {
+        entryId: "timeline-evt-tool",
+        eventId: "evt-tool",
+        sequence: 4,
+        occurredAt: "2026-03-17T12:03:00Z",
+        kind: "tool_action",
+        status: "blocked",
+        title: "identity_api.limited_mfa_recovery",
+        summary: "Approval required: Sensitive account recovery requires approval..",
+        eventType: "tool_call.recorded",
+        stepId: "step_001",
+        toolActionId: "tool_001",
+        approvalRequestId: null,
+        auditId: null,
+        artifactId: null,
+        relatedArtifactIds: ["artifact_001"],
+      },
+      {
+        entryId: "timeline-evt-approval",
+        eventId: "evt-approval",
+        sequence: 5,
+        occurredAt: "2026-03-17T12:04:00Z",
+        kind: "approval",
+        status: "waiting",
+        title: "Approval requested: identity.limited_mfa_recovery",
+        summary: "Approve the limited recovery path.",
+        eventType: "approval.requested",
+        stepId: "step_001",
+        toolActionId: null,
+        approvalRequestId: "approval_001",
+        auditId: null,
+        artifactId: null,
+        relatedArtifactIds: [],
+      },
+      {
+        entryId: "timeline-evt-audit",
+        eventId: "evt-audit",
+        sequence: 6,
+        occurredAt: "2026-03-17T12:04:30Z",
+        kind: "audit",
+        status: "info",
+        title: "Audit: approval_requested",
+        summary: "Audit record for request req_123.",
+        eventType: "audit.recorded",
+        stepId: "step_001",
+        toolActionId: null,
+        approvalRequestId: null,
+        auditId: "audit_001",
+        artifactId: null,
+        relatedArtifactIds: [],
+      },
+      {
+        entryId: "timeline-evt-artifact",
+        eventId: "evt-artifact",
+        sequence: 7,
+        occurredAt: "2026-03-17T12:05:00Z",
+        kind: "artifact",
+        status: "info",
+        title: "Artifact attached: screenshot",
+        summary: "minio://atlas-artifacts/run_123/screenshot.png",
+        eventType: "artifact.attached",
+        stepId: "step_001",
+        toolActionId: null,
+        approvalRequestId: null,
+        auditId: null,
+        artifactId: "artifact_001",
+        relatedArtifactIds: [],
+      },
+      {
+        entryId: "timeline-evt-outcome",
+        eventId: "evt-outcome",
+        sequence: 8,
+        occurredAt: "2026-03-17T12:12:00Z",
+        kind: "outcome",
+        status: "success",
+        title: "Run succeeded",
+        summary: "Scenario passed.",
+        eventType: "run.completed",
+        stepId: null,
+        toolActionId: null,
+        approvalRequestId: null,
+        auditId: null,
+        artifactId: null,
+        relatedArtifactIds: [],
+      },
+    ],
+    artifacts: [
+      {
+        artifactId: "artifact_001",
+        eventId: "evt-artifact",
+        timelineEntryId: "timeline-evt-artifact",
+        stepId: "step_001",
+        createdAt: "2026-03-17T12:05:00Z",
+        kind: "screenshot",
+        uri: "minio://atlas-artifacts/run_123/screenshot.png",
+        contentType: "image/png",
+        displayName: "Account recovery screenshot",
+        description: null,
+        metadata: {},
+      },
+    ],
+    toolActions: [
+      {
+        toolActionId: "tool_001",
+        eventId: "evt-tool",
+        sequence: 4,
+        occurredAt: "2026-03-17T12:03:00Z",
+        stepId: "step_001",
+        requestId: "req_123",
+        toolCall: {
+          toolCallId: "tool_001",
+          toolName: "identity_api",
+          action: "limited_mfa_recovery",
+          arguments: { employee_id: "emp_123" },
+          status: "blocked",
+          result: null,
+          errorMessage: "tool execution paused pending approval",
+        },
+        policyDecision: {
+          decisionId: "policy_001",
+          outcome: "require_approval",
+          actionType: "identity.limited_mfa_recovery",
+          rationale: "Sensitive account recovery requires approval.",
+          approvalRequestId: "approval_001",
+          metadata: {},
+        },
+        artifactIds: ["artifact_001"],
+      },
+    ],
+    policyDecisions: [
+      {
+        policyDecisionId: "policy_001",
+        eventId: "evt-tool",
+        sequence: 4,
+        occurredAt: "2026-03-17T12:03:00Z",
+        toolActionId: "tool_001",
+        decision: {
+          decisionId: "policy_001",
+          outcome: "require_approval",
+          actionType: "identity.limited_mfa_recovery",
+          rationale: "Sensitive account recovery requires approval.",
+          approvalRequestId: "approval_001",
+          metadata: {},
+        },
+      },
+    ],
+    approvals: [
+      {
+        approvalRequestId: "approval_001",
+        request: {
+          approvalRequestId: "approval_001",
+          runId: "phase5-policy-demo-001",
+          stepId: "step_001",
+          status: "approved",
+          requestedActionType: "identity.limited_mfa_recovery",
+          toolName: "identity_api",
+          requestedArguments: { employee_id: "emp_123" },
+          requesterRole: "helpdesk_agent",
+          reasonCode: "approval_required",
+          summary: "Approve the limited recovery path.",
+          targetResourceType: "employee",
+          targetResourceId: "emp_123",
+          requestedAt: "2026-03-17T12:04:00Z",
+          expiresAt: null,
+          resolvedAt: "2026-03-17T12:06:00Z",
+          resolutionSummary: "Approved for the seeded demo path.",
+          metadata: {},
+        },
+        requestedEventId: "evt-approval",
+        waitingEventId: "evt-waiting",
+        resolvedEventId: "evt-resolved",
+        resumedEventId: "evt-resumed",
+        requestedAt: "2026-03-17T12:04:00Z",
+        waitingAt: "2026-03-17T12:04:05Z",
+        decidedAt: "2026-03-17T12:06:00Z",
+        resumedAt: "2026-03-17T12:06:03Z",
+        operatorId: "operator_001",
+      },
+    ],
+    auditRecords: [
+      {
+        auditId: "audit_001",
+        eventId: "evt-audit",
+        sequence: 6,
+        occurredAt: "2026-03-17T12:04:30Z",
+        stepId: "step_001",
+        requestId: "req_123",
+        eventKind: "approval_requested",
+        actorType: "bastion",
+        payload: {},
+      },
+    ],
+    outcome: {
+      eventId: "evt-outcome",
+      sequence: 8,
+      finalStatus: "succeeded",
+      completedAt: "2026-03-17T12:12:00Z",
+      gradeResult: run.gradeResult,
+      summary: "Scenario passed.",
+    },
   };
 }
 
@@ -261,5 +515,40 @@ describe("runs approval UI", () => {
     expect(screen.getByText("run_interrupt_001")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop run" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("local-operator")).toBeInTheDocument();
+  });
+});
+
+describe("run detail timeline UI", () => {
+  it("renders grouped replay entries for the main event types", () => {
+    render(<RunDetailTimeline replay={makeReplay()} />);
+
+    expect(screen.getByRole("heading", { name: "Run created" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "identity_api.limited_mfa_recovery" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Approval requested: identity.limited_mfa_recovery",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Audit: approval_requested" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Artifact attached: screenshot" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Run succeeded" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders detail blocks for tool, approval, audit, and artifact entries", () => {
+    render(<RunDetailTimeline replay={makeReplay()} />);
+
+    expect(screen.getByText(/tool execution paused pending approval/i)).toBeInTheDocument();
+    expect(screen.getByText(/approval flow/i)).toBeInTheDocument();
+    expect(screen.getByText(/audit evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/account recovery screenshot/i)).toBeInTheDocument();
+    expect(screen.getByText("artifact_001")).toBeInTheDocument();
   });
 });
