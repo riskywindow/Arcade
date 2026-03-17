@@ -13,6 +13,7 @@ import {
   RunDashboardLoading,
 } from "@/components/runs/run-dashboard";
 import { RunInterruptPanel } from "@/components/runs/run-interrupt-panel";
+import { RunSecurityPanels } from "@/components/runs/run-security-panels";
 
 function makeRun(overrides: Partial<Run> = {}): Run {
   return {
@@ -256,12 +257,59 @@ function makeReplay(): RunReplay {
           actionType: "identity.limited_mfa_recovery",
           rationale: "Sensitive account recovery requires approval.",
           approvalRequestId: "approval_001",
-          metadata: {},
+          metadata: {
+            reason_code: "approval_required",
+          },
         },
         artifactIds: ["artifact_001"],
       },
+      {
+        toolActionId: "tool_002",
+        eventId: "evt-tool-deny",
+        sequence: 3,
+        occurredAt: "2026-03-17T12:02:00Z",
+        stepId: "step_001",
+        requestId: "req_122",
+        toolCall: {
+          toolCallId: "tool_002",
+          toolName: "identity_api",
+          action: "reset_password",
+          arguments: { employee_id: "emp_123" },
+          status: "blocked",
+          result: null,
+          errorMessage: "tool execution blocked by Bastion policy",
+        },
+        policyDecision: {
+          decisionId: "policy_002",
+          outcome: "deny",
+          actionType: "identity.reset_password",
+          rationale: "Direct password resets are blocked in the seeded demo path.",
+          approvalRequestId: null,
+          metadata: {
+            reason_code: "forbidden_shortcut",
+          },
+        },
+        artifactIds: [],
+      },
     ],
     policyDecisions: [
+      {
+        policyDecisionId: "policy_002",
+        eventId: "evt-tool-deny",
+        sequence: 3,
+        occurredAt: "2026-03-17T12:02:00Z",
+        toolActionId: "tool_002",
+        decision: {
+          decisionId: "policy_002",
+          outcome: "deny",
+          actionType: "identity.reset_password",
+          rationale: "Direct password resets are blocked in the seeded demo path.",
+          approvalRequestId: null,
+          metadata: {
+            reason_code: "forbidden_shortcut",
+          },
+        },
+      },
       {
         policyDecisionId: "policy_001",
         eventId: "evt-tool",
@@ -274,7 +322,9 @@ function makeReplay(): RunReplay {
           actionType: "identity.limited_mfa_recovery",
           rationale: "Sensitive account recovery requires approval.",
           approvalRequestId: "approval_001",
-          metadata: {},
+          metadata: {
+            reason_code: "approval_required",
+          },
         },
       },
     ],
@@ -322,6 +372,19 @@ function makeReplay(): RunReplay {
         eventKind: "approval_requested",
         actorType: "bastion",
         payload: {},
+      },
+      {
+        auditId: "audit_002",
+        eventId: "evt-audit-stop",
+        sequence: 9,
+        occurredAt: "2026-03-17T12:07:00Z",
+        stepId: "step_002",
+        requestId: "req_stop_001",
+        eventKind: "kill_switch_triggered",
+        actorType: "operator",
+        payload: {
+          reason: "Operator interruption smoke check",
+        },
       },
     ],
     outcome: {
@@ -619,6 +682,58 @@ describe("artifact viewer UI", () => {
     expect(screen.getAllByText(/resolved ticket/i).length).toBeGreaterThan(0);
     expect(
       screen.getByText("http://127.0.0.1:3000/internal/helpdesk/tickets/hd-1002"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("security panels UI", () => {
+  it("renders policy decisions, approval events, and audit highlights", () => {
+    render(<RunSecurityPanels replay={makeReplay()} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Policy decisions" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("identity.reset_password")).toBeInTheDocument();
+    expect(screen.getAllByText("forbidden_shortcut").length).toBeGreaterThan(0);
+    expect(screen.getByText("identity_api.limited_mfa_recovery")).toBeInTheDocument();
+    expect(screen.getAllByText("approval_required").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("heading", { name: "Approval events" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("approved").length).toBeGreaterThan(0);
+    expect(screen.getByText("operator_001")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Audit highlights" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Operator interrupted the run" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/operator interruption smoke check/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders empty states when the replay has no security evidence", () => {
+    const replay = makeReplay();
+    render(
+      <RunSecurityPanels
+        replay={{
+          ...replay,
+          policyDecisions: [],
+          approvals: [],
+          auditRecords: [],
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(/no bastion policy decisions were recorded/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no approval-gated actions were recorded/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no structured audit records were attached/i),
     ).toBeInTheDocument();
   });
 });

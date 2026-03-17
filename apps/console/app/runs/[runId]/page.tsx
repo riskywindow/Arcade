@@ -3,6 +3,7 @@ import React, { type CSSProperties } from "react";
 
 import { RunArtifactViewer } from "@/components/runs/run-artifact-viewer";
 import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
+import { RunSecurityPanels } from "@/components/runs/run-security-panels";
 import { SectionCard } from "@/components/section-card";
 import { getRunReplay } from "@/lib/api/runs";
 import { deriveRunType, formatTimestamp, runTypeLabel } from "@/lib/runs";
@@ -73,35 +74,10 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
           </dl>
         </SectionCard>
         <SectionCard
-          title="Replay counts"
-          description="These grouped counts come from the replay projection endpoint and will back the detailed timeline panels next."
+          title="Bastion decisions"
+          description="Policy outcomes, approval gates, and audit highlights stay visible here so operators can explain why a run was allowed, blocked, paused, or interrupted."
         >
-          <dl style={styles.metaGrid}>
-            <div>
-              <dt style={styles.term}>Tool actions</dt>
-              <dd style={styles.value}>{replay.toolActions.length}</dd>
-            </div>
-            <div>
-              <dt style={styles.term}>Policy decisions</dt>
-              <dd style={styles.value}>{replay.policyDecisions.length}</dd>
-            </div>
-            <div>
-              <dt style={styles.term}>Approvals</dt>
-              <dd style={styles.value}>{replay.approvals.length}</dd>
-            </div>
-            <div>
-              <dt style={styles.term}>Audit records</dt>
-              <dd style={styles.value}>{replay.auditRecords.length}</dd>
-            </div>
-            <div>
-              <dt style={styles.term}>Outcome</dt>
-              <dd style={styles.value}>{replay.outcome.finalStatus}</dd>
-            </div>
-            <div>
-              <dt style={styles.term}>Grade</dt>
-              <dd style={styles.value}>{replay.outcome.gradeResult?.outcome ?? "not graded"}</dd>
-            </div>
-          </dl>
+          <RunSecurityPanels replay={replay} />
         </SectionCard>
         <SectionCard
           title="Artifact viewer"
