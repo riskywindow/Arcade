@@ -910,6 +910,24 @@ export type ReplayOutcome = {
   summary?: string | null;
 };
 
+export type ReplayObjectiveStatus = "met" | "not_met" | "incomplete";
+
+export type ReplayOutcomeCheck = {
+  checkKey: string;
+  label: string;
+  status: ReplayObjectiveStatus;
+  detail: string;
+};
+
+export type ReplayOutcomeExplanation = {
+  objective?: string | null;
+  objectiveStatus: ReplayObjectiveStatus;
+  summary: string;
+  highlights: string[];
+  blockers: string[];
+  stateChecks: ReplayOutcomeCheck[];
+};
+
 export type ReplayTimelineEntryKind =
   | "lifecycle"
   | "step"
@@ -956,6 +974,7 @@ export type RunReplay = {
   approvals: ReplayApproval[];
   auditRecords: ReplayAuditRecord[];
   outcome: ReplayOutcome;
+  outcomeExplanation?: ReplayOutcomeExplanation | null;
 };
 
 export type CreateRunRequest = {

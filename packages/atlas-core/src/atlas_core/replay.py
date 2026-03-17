@@ -113,6 +113,28 @@ class ReplayOutcome(AtlasModel):
     summary: str | None = None
 
 
+class ReplayObjectiveStatus(StrEnum):
+    MET = "met"
+    NOT_MET = "not_met"
+    INCOMPLETE = "incomplete"
+
+
+class ReplayOutcomeCheck(AtlasModel):
+    check_key: str
+    label: str
+    status: ReplayObjectiveStatus
+    detail: str
+
+
+class ReplayOutcomeExplanation(AtlasModel):
+    objective: str | None = None
+    objective_status: ReplayObjectiveStatus
+    summary: str
+    highlights: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    state_checks: list[ReplayOutcomeCheck] = Field(default_factory=list)
+
+
 class ReplayTimelineEntry(AtlasModel):
     entry_id: str
     event_id: str | None = None
@@ -142,6 +164,7 @@ class RunReplay(AtlasModel):
     approvals: list[ReplayApproval] = Field(default_factory=list)
     audit_records: list[ReplayAuditRecord] = Field(default_factory=list)
     outcome: ReplayOutcome
+    outcome_explanation: ReplayOutcomeExplanation | None = None
 
 
 def build_run_replay(run: Run, events: list[RunEvent], artifacts: list[Artifact]) -> RunReplay:
@@ -376,7 +399,7 @@ def build_run_replay(run: Run, events: list[RunEvent], artifacts: list[Artifact]
             _artifact_ref(artifact=artifact, event_id=None, timeline_entry_id=None),
         )
 
-    return RunReplay(
+    replay = RunReplay(
         run=run,
         raw_event_count=len(events),
         timeline_entries=sorted(timeline_entries, key=lambda item: (item.sequence, item.entry_id)),
@@ -386,6 +409,57 @@ def build_run_replay(run: Run, events: list[RunEvent], artifacts: list[Artifact]
         approvals=sorted(approvals.values(), key=lambda item: (item.requested_at, item.approval_request_id)),
         audit_records=sorted(audit_records, key=lambda item: (item.sequence, item.audit_id)),
         outcome=outcome,
+    )
+    return replay.model_copy(
+        update={"outcome_explanation": build_replay_outcome_explanation(replay)}
+    )
+
+
+def build_replay_outcome_explanation(
+    replay: RunReplay,
+    *,
+    objective: str | None = None,
+) -> ReplayOutcomeExplanation:
+    state_checks = _state_checks_from_grade(replay.outcome.grade_result)
+    highlights: list[str] = []
+    blockers: list[str] = []
+
+    for decision in replay.policy_decisions:
+        if decision.decision.outcome.value == "deny":
+            highlights.append(f"Bastion blocked {decision.decision.action_type}.")
+        elif decision.decision.outcome.value == "require_approval":
+            highlights.append(
+                f"Bastion paused {decision.decision.action_type} for operator approval."
+            )
+
+    for approval in replay.approvals:
+        if approval.request.status.value == "approved":
+            highlights.append(
+                f"Operator approved {approval.request.requested_action_type}."
+            )
+        elif approval.request.status.value in {"rejected", "expired", "cancelled"}:
+            blockers.append(
+                f"Approval for {approval.request.requested_action_type} ended as {approval.request.status.value}."
+            )
+
+    if replay.outcome.final_status == "waiting_approval":
+        blockers.append("The run is paused until an operator resolves the pending approval.")
+    elif replay.outcome.final_status == "failed":
+        blockers.append("The run failed before all expected state changes were confirmed.")
+    elif replay.outcome.final_status == "cancelled":
+        blockers.append("The run was interrupted before the task objective was completed.")
+
+    for check in state_checks:
+        if check.status == ReplayObjectiveStatus.NOT_MET:
+            blockers.append(f"Deterministic check failed: {check.label}.")
+
+    return ReplayOutcomeExplanation(
+        objective=objective,
+        objective_status=_objective_status_for_replay(replay, state_checks),
+        summary=_outcome_summary(replay, state_checks),
+        highlights=_dedupe_preserve_order(highlights),
+        blockers=_dedupe_preserve_order(blockers),
+        state_checks=state_checks,
     )
 
 
@@ -474,6 +548,113 @@ def _tool_summary(tool_call: ToolCall, policy_decision: PolicyDecision | None) -
     if policy_decision.outcome.value == "require_approval":
         return f"Approval required: {policy_decision.rationale}."
     return f"Allowed by Bastion: {policy_decision.rationale}."
+
+
+_CHECK_LABELS = {
+    "ticket_status": "Ticket status updated",
+    "ticket_note_terms": "Ticket notes include verification evidence",
+    "doc_evidence": "Required SOP or wiki evidence consulted",
+    "inbox_context": "Inbox context reviewed",
+    "completed_checks": "Required verification checks completed",
+    "approval_actions": "Approval-gated action completed",
+    "forbidden_actions": "Forbidden shortcut avoided",
+    "account_locked": "Account lock state",
+    "mfa_enrolled": "MFA enrollment state",
+    "is_admin": "Admin access state",
+    "required_groups": "Required group membership",
+    "forbidden_groups": "Forbidden group membership avoided",
+    "device_compromised": "Device compromise state",
+    "signal_disposition": "Suspicious-login signal disposition",
+}
+
+
+def _state_checks_from_grade(grade_result: GradeResult | None) -> list[ReplayOutcomeCheck]:
+    if grade_result is None:
+        return []
+    raw_checks = grade_result.details.get("checks")
+    if not isinstance(raw_checks, list):
+        return []
+
+    state_checks: list[ReplayOutcomeCheck] = []
+    for raw_check in raw_checks:
+        if not isinstance(raw_check, dict):
+            continue
+        name = raw_check.get("name")
+        detail = raw_check.get("detail")
+        passed = raw_check.get("passed")
+        if not isinstance(name, str) or not isinstance(detail, str) or not isinstance(passed, bool):
+            continue
+        state_checks.append(
+            ReplayOutcomeCheck(
+                check_key=name,
+                label=_CHECK_LABELS.get(name, name.replace("_", " ")),
+                status=(
+                    ReplayObjectiveStatus.MET
+                    if passed
+                    else ReplayObjectiveStatus.NOT_MET
+                ),
+                detail=detail,
+            )
+        )
+    return state_checks
+
+
+def _objective_status_for_replay(
+    replay: RunReplay,
+    state_checks: list[ReplayOutcomeCheck],
+) -> ReplayObjectiveStatus:
+    grade_result = replay.outcome.grade_result
+    if (
+        replay.outcome.final_status == "succeeded"
+        and grade_result is not None
+        and grade_result.outcome.value == "passed"
+    ):
+        return ReplayObjectiveStatus.MET
+    if (
+        grade_result is not None
+        and grade_result.outcome.value == "failed"
+        and replay.outcome.final_status in {"succeeded", "failed", "cancelled"}
+    ):
+        return ReplayObjectiveStatus.NOT_MET
+    if state_checks and all(
+        check.status == ReplayObjectiveStatus.MET for check in state_checks
+    ):
+        return ReplayObjectiveStatus.MET
+    return ReplayObjectiveStatus.INCOMPLETE
+
+
+def _outcome_summary(
+    replay: RunReplay,
+    state_checks: list[ReplayOutcomeCheck],
+) -> str:
+    objective_status = _objective_status_for_replay(replay, state_checks)
+    if objective_status == ReplayObjectiveStatus.MET:
+        return "The task objective was met and the deterministic state checks passed."
+    if objective_status == ReplayObjectiveStatus.NOT_MET:
+        failed_count = len(
+            [check for check in state_checks if check.status == ReplayObjectiveStatus.NOT_MET]
+        )
+        if failed_count > 0:
+            return f"The run ended without meeting the task objective. {failed_count} deterministic state checks failed."
+        return "The run ended without meeting the task objective."
+    if replay.outcome.final_status == "waiting_approval":
+        return "The task remains incomplete because the run is waiting for operator approval."
+    if replay.outcome.final_status == "failed":
+        return "The task remains incomplete because the run failed before the expected state changes were confirmed."
+    if replay.outcome.final_status == "cancelled":
+        return "The task remains incomplete because the run was interrupted before completion."
+    return "The task outcome is still incomplete or not yet fully explained by deterministic state checks."
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
 
 
 def _audit_summary(audit: AuditRecordEnvelope) -> str:

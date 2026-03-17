@@ -3,6 +3,7 @@ import React, { type CSSProperties } from "react";
 
 import { RunArtifactViewer } from "@/components/runs/run-artifact-viewer";
 import { RunDetailTimeline } from "@/components/runs/run-detail-timeline";
+import { RunOutcomePanel } from "@/components/runs/run-outcome-panel";
 import { RunSecurityPanels } from "@/components/runs/run-security-panels";
 import { SectionCard } from "@/components/section-card";
 import { getRunReplay } from "@/lib/api/runs";
@@ -41,6 +42,12 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
           description="The main replay surface groups lifecycle, tool, policy, approval, audit, artifact, and terminal outcome events from the run replay contract."
         >
           <RunDetailTimeline replay={replay} />
+        </SectionCard>
+        <SectionCard
+          title="Outcome and state"
+          description="This summary ties the replay back to the task objective and the deterministic state checks that explain why the run succeeded, failed, or stayed incomplete."
+        >
+          <RunOutcomePanel replay={replay} />
         </SectionCard>
         <SectionCard
           title="Run summary"

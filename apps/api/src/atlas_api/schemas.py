@@ -361,6 +361,22 @@ class ReplayOutcomeSchema(ApiModel):
     summary: str | None = None
 
 
+class ReplayOutcomeCheckSchema(ApiModel):
+    check_key: str
+    label: str
+    status: str
+    detail: str
+
+
+class ReplayOutcomeExplanationSchema(ApiModel):
+    objective: str | None = None
+    objective_status: str
+    summary: str
+    highlights: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    state_checks: list[ReplayOutcomeCheckSchema] = Field(default_factory=list)
+
+
 class ReplayTimelineEntrySchema(ApiModel):
     entry_id: str
     event_id: str | None = None
@@ -390,6 +406,7 @@ class RunReplaySchema(ApiModel):
     approvals: list[ReplayApprovalSchema] = Field(default_factory=list)
     audit_records: list[ReplayAuditRecordSchema] = Field(default_factory=list)
     outcome: ReplayOutcomeSchema
+    outcome_explanation: ReplayOutcomeExplanationSchema | None = None
 
 
 class CreateRunRequest(ApiModel):

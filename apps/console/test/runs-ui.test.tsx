@@ -13,6 +13,7 @@ import {
   RunDashboardLoading,
 } from "@/components/runs/run-dashboard";
 import { RunInterruptPanel } from "@/components/runs/run-interrupt-panel";
+import { RunOutcomePanel } from "@/components/runs/run-outcome-panel";
 import { RunSecurityPanels } from "@/components/runs/run-security-panels";
 
 function makeRun(overrides: Partial<Run> = {}): Run {
@@ -395,6 +396,38 @@ function makeReplay(): RunReplay {
       gradeResult: run.gradeResult,
       summary: "Scenario passed.",
     },
+    outcomeExplanation: {
+      objective:
+        "Restore access using the approved recovery path and leave a correct ticket record.",
+      objectiveStatus: "met",
+      summary: "The task objective was met and the deterministic state checks passed.",
+      highlights: [
+        "Bastion blocked identity.reset_password.",
+        "Bastion paused identity.limited_mfa_recovery for operator approval.",
+        "Operator approved identity.limited_mfa_recovery.",
+      ],
+      blockers: [],
+      stateChecks: [
+        {
+          checkKey: "ticket_status",
+          label: "Ticket status updated",
+          status: "met",
+          detail: "ticket status resolved in ('resolved',)",
+        },
+        {
+          checkKey: "account_locked",
+          label: "Account lock state",
+          status: "met",
+          detail: "account_locked == False",
+        },
+        {
+          checkKey: "approval_actions",
+          label: "Approval-gated action completed",
+          status: "met",
+          detail: "approval actions include ('identity.limited_mfa_recovery',)",
+        },
+      ],
+    },
   };
 }
 
@@ -734,6 +767,41 @@ describe("security panels UI", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(/no structured audit records were attached/i),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("outcome panel UI", () => {
+  it("renders the task objective, highlights, and deterministic state checks", () => {
+    render(<RunOutcomePanel replay={makeReplay()} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Objective and state summary" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Restore access using the approved recovery path and leave a correct ticket record.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/bastion blocked identity\.reset_password/i)).toBeInTheDocument();
+    expect(screen.getByText("Ticket status updated")).toBeInTheDocument();
+    expect(screen.getByText("account_locked == False")).toBeInTheDocument();
+    expect(screen.getAllByText("met").length).toBeGreaterThan(0);
+  });
+
+  it("renders an empty state when no outcome explanation is attached", () => {
+    const replay = makeReplay();
+    render(
+      <RunOutcomePanel
+        replay={{
+          ...replay,
+          outcomeExplanation: null,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(/no outcome explanation is available yet/i),
     ).toBeInTheDocument();
   });
 });

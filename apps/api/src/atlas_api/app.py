@@ -76,6 +76,7 @@ from atlas_core import (
     RunService,
     RunStatus,
     TaskRef,
+    build_replay_outcome_explanation,
     build_run_replay,
     open_run_store_connection,
 )
@@ -87,6 +88,7 @@ from atlas_env_helpdesk import (
     InvalidTicketTransitionError,
     TicketStatus,
     WikiDocumentNotFoundError,
+    get_scenario_definition,
 )
 
 
@@ -116,6 +118,21 @@ def _to_artifact_schema(artifact) -> ArtifactSchema:
 
 def _to_run_replay_schema(replay: RunReplay) -> RunReplaySchema:
     return RunReplaySchema.model_validate(replay.model_dump(mode="json"))
+
+
+def _apply_outcome_objective(replay: RunReplay) -> RunReplay:
+    try:
+        scenario = get_scenario_definition(replay.run.scenario.scenario_id)
+    except KeyError:
+        return replay
+    return replay.model_copy(
+        update={
+            "outcome_explanation": build_replay_outcome_explanation(
+                replay,
+                objective=scenario.public_task.success_condition,
+            )
+        }
+    )
 
 
 def _to_approval_schema(approval: ApprovalRequestRef) -> ApprovalRequestSchema:
@@ -477,7 +494,7 @@ def create_app(config: ApiConfig | None = None) -> FastAPI:
             artifacts = run_service.list_run_artifacts(run_id)
         except RunNotFoundError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        replay = build_run_replay(run, events, artifacts)
+        replay = _apply_outcome_objective(build_run_replay(run, events, artifacts))
         return RunReplayResponse(replay=_to_run_replay_schema(replay))
 
     @app.get("/runs/{run_id}/audit", response_model=AuditListResponse)

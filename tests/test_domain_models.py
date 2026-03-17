@@ -38,6 +38,7 @@ from atlas_core import (
     ToolCall,
     ToolCallRecordedPayload,
     ToolCallStatus,
+    build_replay_outcome_explanation,
     build_run_replay,
 )
 
@@ -406,3 +407,43 @@ def test_run_replay_projection_round_trips_through_json() -> None:
     assert serialized["tool_actions"][0]["artifact_ids"] == ["artifact_001"]
     assert serialized["policy_decisions"][0]["decision"]["outcome"] == "allow"
     assert serialized["outcome"]["final_status"] == "succeeded"
+
+
+def test_replay_outcome_explanation_normalizes_state_checks() -> None:
+    run = _run().model_copy(
+        update={
+            "status": RunStatus.SUCCEEDED,
+            "grade_result": GradeResult(
+                grade_id="grade_456",
+                outcome=GradeOutcome.FAILED,
+                score=0.0,
+                summary="travel-lockout-recovery failed deterministic checks",
+                details={
+                    "checks": [
+                        {
+                            "name": "ticket_status",
+                            "passed": True,
+                            "detail": "ticket status resolved in ('resolved',)",
+                        },
+                        {
+                            "name": "account_locked",
+                            "passed": False,
+                            "detail": "account_locked == False",
+                        },
+                    ]
+                },
+            ),
+        }
+    )
+    replay = build_run_replay(run, [], [])
+
+    explanation = build_replay_outcome_explanation(
+        replay,
+        objective="Restore access using the approved recovery path.",
+    )
+
+    assert explanation.objective == "Restore access using the approved recovery path."
+    assert explanation.objective_status.value == "not_met"
+    assert explanation.state_checks[0].label == "Ticket status updated"
+    assert explanation.state_checks[1].label == "Account lock state"
+    assert explanation.blockers == ["Deterministic check failed: Account lock state."]
