@@ -64,7 +64,13 @@ class RunEventType(StrEnum):
     RUN_CREATED = "run.created"
     RUN_READY = "run.ready"
     RUN_STARTED = "run.started"
+    RUN_STOP_REQUESTED = "run.stop_requested"
+    RUN_WAITING_APPROVAL = "run.waiting_approval"
+    RUN_RESUMED = "run.resumed"
     RUN_STEP_CREATED = "run.step.created"
+    APPROVAL_REQUESTED = "approval.requested"
+    APPROVAL_RESOLVED = "approval.resolved"
+    AUDIT_RECORDED = "audit.recorded"
     TOOL_CALL_RECORDED = "tool_call.recorded"
     ARTIFACT_ATTACHED = "artifact.attached"
     RUN_COMPLETED = "run.completed"
@@ -201,6 +207,31 @@ class RunStartedPayload(EventPayloadModel):
     started_at: datetime
 
 
+class RunStopRequestedPayload(EventPayloadModel):
+    event_type: Literal[RunEventType.RUN_STOP_REQUESTED]
+    run_id: str
+    stop_request_id: str
+    operator_id: str
+    requested_at: datetime
+    reason: str | None = None
+
+
+class RunWaitingApprovalPayload(EventPayloadModel):
+    event_type: Literal[RunEventType.RUN_WAITING_APPROVAL]
+    run_id: str
+    status: Literal[RunStatus.WAITING_APPROVAL]
+    approval_request_id: str
+    waiting_at: datetime
+
+
+class RunResumedPayload(EventPayloadModel):
+    event_type: Literal[RunEventType.RUN_RESUMED]
+    run_id: str
+    status: Literal[RunStatus.RUNNING]
+    approval_request_id: str
+    resumed_at: datetime
+
+
 class RunStepCreatedPayload(EventPayloadModel):
     event_type: Literal[RunEventType.RUN_STEP_CREATED]
     run_id: str
@@ -213,6 +244,26 @@ class ToolCallRecordedPayload(EventPayloadModel):
     step_id: str | None = None
     tool_call: ToolCall
     policy_decision: PolicyDecision | None = None
+
+
+class ApprovalRequestedPayload(EventPayloadModel):
+    event_type: Literal[RunEventType.APPROVAL_REQUESTED]
+    run_id: str
+    approval_request: dict[str, Any]
+
+
+class ApprovalResolvedPayload(EventPayloadModel):
+    event_type: Literal[RunEventType.APPROVAL_RESOLVED]
+    run_id: str
+    approval_request: dict[str, Any]
+    operator_id: str
+    decided_at: datetime
+
+
+class AuditRecordedPayload(EventPayloadModel):
+    event_type: Literal[RunEventType.AUDIT_RECORDED]
+    run_id: str
+    audit_record: dict[str, Any]
 
 
 class ArtifactAttachedPayload(EventPayloadModel):
@@ -238,7 +289,13 @@ RunEventPayload = Annotated[
     RunCreatedPayload
     | RunReadyPayload
     | RunStartedPayload
+    | RunStopRequestedPayload
+    | RunWaitingApprovalPayload
+    | RunResumedPayload
     | RunStepCreatedPayload
+    | ApprovalRequestedPayload
+    | ApprovalResolvedPayload
+    | AuditRecordedPayload
     | ToolCallRecordedPayload
     | ArtifactAttachedPayload
     | RunCompletedPayload,

@@ -5,6 +5,26 @@ import type { ConsoleNavItem } from "@atlas/shared-types";
 
 const navItems: ConsoleNavItem[] = [
   {
+    href: "/internal/helpdesk",
+    label: "Helpdesk",
+    description: "Seeded internal ticket queue and detail workflow.",
+  },
+  {
+    href: "/internal/directory",
+    label: "Directory",
+    description: "Seeded employee, device, and access lookup workflow.",
+  },
+  {
+    href: "/internal/wiki",
+    label: "Wiki",
+    description: "Seeded runbooks, policy docs, and troubleshooting guides.",
+  },
+  {
+    href: "/internal/inbox",
+    label: "Inbox",
+    description: "Seeded email and internal message threads for scenario evidence.",
+  },
+  {
     href: "/",
     label: "Home",
     description: "Console overview and phase boundary.",
@@ -38,12 +58,17 @@ export function AppShell({ children }: AppShellProps) {
           <p style={styles.eyebrow}>Atlas + Bastion</p>
           <h1 style={styles.brand}>Operator Console</h1>
           <p style={styles.tagline}>
-            Phase 1 shell for runs, scenarios, replay, policy, and grading.
+            Internal apps and operator views for the deterministic Atlas + Bastion demo path.
           </p>
         </div>
         <nav aria-label="Primary" style={styles.nav}>
           {navItems.map((item) => (
-            <Link href={item.href} key={item.href} style={styles.navItem}>
+            <Link
+              href={item.href}
+              key={item.href}
+              style={styles.navItem}
+              data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+            >
               <strong>{item.label}</strong>
               <span style={styles.navDescription}>{item.description}</span>
             </Link>

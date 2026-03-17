@@ -1,13 +1,12 @@
 # packages/shared-types
 
-Shared TypeScript contracts shell.
+Shared TypeScript transport contracts.
 
-Real runtime contracts are deferred until Phase 2.
-
-Ownership:
+Current ownership:
 
 - browser-facing and API-facing TypeScript contracts live here
-- Python-internal models do not belong here
+- run, event, artifact, and API response/request transport shapes live here
+- Python-internal models and DB schema do not belong here
 - contracts should stay additive and transport-oriented
 
 Allowed imports:

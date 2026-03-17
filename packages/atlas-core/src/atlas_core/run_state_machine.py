@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from atlas_core.domain import (
+    RunResumedPayload,
     RunCompletedPayload,
     RunEvent,
     RunEventType,
     RunReadyPayload,
     RunStartedPayload,
     RunStatus,
+    RunStopRequestedPayload,
+    RunWaitingApprovalPayload,
 )
 
 TERMINAL_RUN_STATUSES = frozenset(
@@ -90,6 +93,17 @@ def transition_status_for_event(event: RunEvent) -> RunStatus | None:
         started_payload = payload
         assert isinstance(started_payload, RunStartedPayload)
         return started_payload.status
+    if event.event_type == RunEventType.RUN_STOP_REQUESTED:
+        assert isinstance(payload, RunStopRequestedPayload)
+        return None
+    if event.event_type == RunEventType.RUN_WAITING_APPROVAL:
+        waiting_payload = payload
+        assert isinstance(waiting_payload, RunWaitingApprovalPayload)
+        return waiting_payload.status
+    if event.event_type == RunEventType.RUN_RESUMED:
+        resumed_payload = payload
+        assert isinstance(resumed_payload, RunResumedPayload)
+        return resumed_payload.status
     if event.event_type == RunEventType.RUN_COMPLETED:
         completed_payload = payload
         assert isinstance(completed_payload, RunCompletedPayload)

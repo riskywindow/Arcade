@@ -219,6 +219,30 @@ def test_discover_migrations_requires_up_and_down_pairs(tmp_path) -> None:
         discover_migrations(tmp_path)
 
 
+def test_apply_migrations_is_idempotent() -> None:
+    conn = _connect_for_test()
+    if conn is None:
+        pytest.skip("local Postgres is not available")
+
+    schema_name = f"test_run_spine_idempotent_{uuid.uuid4().hex[:8]}"
+    migrations = discover_migrations(DEFAULT_MIGRATIONS_DIR)
+
+    conn.autocommit = True
+    try:
+        conn.execute(f'create schema "{schema_name}"')
+        conn.execute(f'set search_path to "{schema_name}"')
+
+        first_apply = apply_migrations(conn, migrations)
+        second_apply = apply_migrations(conn, migrations)
+
+        assert first_apply == ["0001"]
+        assert second_apply == []
+    finally:
+        with suppress(psycopg.Error):
+            conn.execute(f'drop schema if exists "{schema_name}" cascade')
+        conn.close()
+
+
 def test_cleanup_safely_ignores_missing_schema() -> None:
     conn = _connect_for_test()
     if conn is None:

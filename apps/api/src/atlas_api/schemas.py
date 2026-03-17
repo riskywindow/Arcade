@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from atlas_core.domain import (
     ActorType,
+    AuditRecordedPayload,
     ArtifactKind,
     GradeOutcome,
     PolicyDecisionOutcome,
@@ -16,6 +17,8 @@ from atlas_core.domain import (
     RunStepStatus,
     ToolCallStatus,
 )
+from atlas_core.bastion import ApprovalRequestStatus
+from atlas_env_helpdesk import NoteKind
 
 
 def _to_camel(value: str) -> str:
@@ -81,6 +84,26 @@ class PolicyDecisionSchema(ApiModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ApprovalRequestSchema(ApiModel):
+    approval_request_id: str
+    run_id: str
+    step_id: str | None = None
+    status: ApprovalRequestStatus
+    requested_action_type: str
+    tool_name: str | None = None
+    requested_arguments: dict[str, Any] = Field(default_factory=dict)
+    requester_role: str
+    reason_code: str | None = None
+    summary: str | None = None
+    target_resource_type: str | None = None
+    target_resource_id: str | None = None
+    requested_at: datetime
+    expires_at: datetime | None = None
+    resolved_at: datetime | None = None
+    resolution_summary: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class ArtifactSchema(ApiModel):
     schema_version: int = 1
     artifact_id: str
@@ -143,6 +166,34 @@ class RunStartedPayloadSchema(ApiModel):
     started_at: datetime
 
 
+class RunStopRequestedPayloadSchema(ApiModel):
+    schema_version: int = 1
+    event_type: RunEventType
+    run_id: str
+    stop_request_id: str
+    operator_id: str
+    requested_at: datetime
+    reason: str | None = None
+
+
+class RunWaitingApprovalPayloadSchema(ApiModel):
+    schema_version: int = 1
+    event_type: RunEventType
+    run_id: str
+    status: RunStatus
+    approval_request_id: str
+    waiting_at: datetime
+
+
+class RunResumedPayloadSchema(ApiModel):
+    schema_version: int = 1
+    event_type: RunEventType
+    run_id: str
+    status: RunStatus
+    approval_request_id: str
+    resumed_at: datetime
+
+
 class RunStepCreatedPayloadSchema(ApiModel):
     schema_version: int = 1
     event_type: RunEventType
@@ -157,6 +208,40 @@ class ToolCallRecordedPayloadSchema(ApiModel):
     step_id: str | None = None
     tool_call: ToolCallSchema
     policy_decision: PolicyDecisionSchema | None = None
+
+
+class ApprovalRequestedPayloadSchema(ApiModel):
+    schema_version: int = 1
+    event_type: RunEventType
+    run_id: str
+    approval_request: ApprovalRequestSchema
+
+
+class ApprovalResolvedPayloadSchema(ApiModel):
+    schema_version: int = 1
+    event_type: RunEventType
+    run_id: str
+    approval_request: ApprovalRequestSchema
+    operator_id: str
+    decided_at: datetime
+
+
+class AuditRecordSchema(ApiModel):
+    audit_id: str
+    run_id: str
+    step_id: str | None = None
+    request_id: str | None = None
+    actor_type: ActorType
+    event_kind: str
+    occurred_at: datetime
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuditRecordedPayloadSchema(ApiModel):
+    schema_version: int = 1
+    event_type: RunEventType
+    run_id: str
+    audit_record: AuditRecordSchema
 
 
 class ArtifactAttachedPayloadSchema(ApiModel):
@@ -180,7 +265,13 @@ RunEventPayloadSchema = (
     RunCreatedPayloadSchema
     | RunReadyPayloadSchema
     | RunStartedPayloadSchema
+    | RunStopRequestedPayloadSchema
+    | RunWaitingApprovalPayloadSchema
+    | RunResumedPayloadSchema
     | RunStepCreatedPayloadSchema
+    | ApprovalRequestedPayloadSchema
+    | ApprovalResolvedPayloadSchema
+    | AuditRecordedPayloadSchema
     | ToolCallRecordedPayloadSchema
     | ArtifactAttachedPayloadSchema
     | RunCompletedPayloadSchema
@@ -231,3 +322,222 @@ class RunEventListResponse(ApiModel):
 class ArtifactListResponse(ApiModel):
     run_id: str
     artifacts: list[ArtifactSchema]
+
+
+class AuditListResponse(ApiModel):
+    run_id: str
+    records: list[AuditRecordSchema]
+
+
+class ApprovalListResponse(ApiModel):
+    run_id: str
+    approvals: list[ApprovalRequestSchema]
+
+
+class ApprovalDecisionRequest(ApiModel):
+    operator_id: str
+    resolution_summary: str | None = None
+
+
+class StopRunRequest(ApiModel):
+    operator_id: str
+    reason: str | None = None
+
+
+class ApprovalResponse(ApiModel):
+    approval: ApprovalRequestSchema
+
+
+class StopRunResponse(ApiModel):
+    run_id: str
+    status: RunStatus
+    stop_request_id: str
+    requested_at: datetime
+
+
+class EmployeeSummarySchema(ApiModel):
+    employee_id: str
+    display_name: str
+    email: str
+    title: str
+    department_slug: str
+    manager_employee_id: str | None = None
+
+
+class DeviceSummarySchema(ApiModel):
+    device_id: str
+    employee_id: str
+    hostname: str
+    platform: str
+    health_state: str
+    compromised: bool
+    assigned_at: datetime
+    serial_number: str
+
+
+class AccountAccessSummarySchema(ApiModel):
+    account_id: str
+    email: str
+    account_locked: bool
+    mfa_enrolled: bool
+    groups: list[str] = Field(default_factory=list)
+    is_admin: bool
+    password_last_reset_at: datetime
+
+
+class SuspiciousEventSummarySchema(ApiModel):
+    event_id: str
+    employee_id: str
+    detected_at: datetime
+    signal_type: str
+    severity: str
+    summary: str
+    disposition: str
+
+
+class TicketNoteSchema(ApiModel):
+    note_id: str
+    ticket_id: str
+    author: str
+    body: str
+    kind: NoteKind
+    created_at: datetime
+
+
+class HelpdeskTicketSchema(ApiModel):
+    ticket_id: str
+    requester_employee_id: str
+    assigned_team: str
+    assigned_to: str | None = None
+    status: str
+    priority: str
+    title: str
+    summary: str
+    created_at: datetime
+    updated_at: datetime
+    related_employee_id: str | None = None
+    related_device_id: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    notes: list[TicketNoteSchema] = Field(default_factory=list)
+
+
+class HelpdeskTicketDetailSchema(ApiModel):
+    ticket: HelpdeskTicketSchema
+    requester: EmployeeSummarySchema
+    related_employee: EmployeeSummarySchema | None = None
+    related_device: DeviceSummarySchema | None = None
+
+
+class HelpdeskTicketQueueResponse(ApiModel):
+    seed: str
+    tickets: list[HelpdeskTicketSchema]
+
+
+class HelpdeskTicketResponse(ApiModel):
+    ticket: HelpdeskTicketSchema
+
+
+class HelpdeskTicketDetailResponse(ApiModel):
+    detail: HelpdeskTicketDetailSchema
+
+
+class DirectoryEmployeeSchema(ApiModel):
+    employee_id: str
+    display_name: str
+    email: str
+    title: str
+    department_slug: str
+    employment_status: str
+    location: str
+    manager_employee_id: str | None = None
+    start_date: datetime
+
+
+class DirectoryEmployeeListResponse(ApiModel):
+    seed: str
+    employees: list[DirectoryEmployeeSchema]
+
+
+class DirectoryEmployeeDetailSchema(ApiModel):
+    employee: DirectoryEmployeeSchema
+    manager: EmployeeSummarySchema | None = None
+    devices: list[DeviceSummarySchema]
+    account_access: AccountAccessSummarySchema
+    related_tickets: list[HelpdeskTicketSchema]
+    suspicious_events: list[SuspiciousEventSummarySchema]
+
+
+class DirectoryEmployeeDetailResponse(ApiModel):
+    detail: DirectoryEmployeeDetailSchema
+
+
+class WikiDocumentSchema(ApiModel):
+    page_id: str
+    slug: str
+    title: str
+    category: str
+    summary: str
+    body: str
+    updated_at: datetime
+
+
+class WikiDocumentListResponse(ApiModel):
+    seed: str
+    documents: list[WikiDocumentSchema]
+
+
+class WikiDocumentResponse(ApiModel):
+    document: WikiDocumentSchema
+
+
+class WikiSearchResultSchema(ApiModel):
+    document: WikiDocumentSchema
+    score: int
+    matched_terms: list[str] = Field(default_factory=list)
+
+
+class WikiSearchResponseSchema(ApiModel):
+    seed: str
+    query: str
+    results: list[WikiSearchResultSchema]
+
+
+class InboxMessageSchema(ApiModel):
+    message_id: str
+    sender: str
+    sent_at: datetime
+    subject: str
+    body: str
+    channel: str
+
+
+class InboxThreadSchema(ApiModel):
+    thread_id: str
+    participant_emails: list[str]
+    subject: str
+    messages: list[InboxMessageSchema]
+    last_message_at: datetime
+    message_count: int
+
+
+class InboxThreadListResponse(ApiModel):
+    seed: str
+    threads: list[InboxThreadSchema]
+
+
+class InboxThreadResponse(ApiModel):
+    thread: InboxThreadSchema
+
+
+class AddTicketNoteRequest(ApiModel):
+    author: str
+    body: str
+    kind: NoteKind = NoteKind.INTERNAL
+
+
+class AssignTicketRequest(ApiModel):
+    assigned_to: str | None = None
+
+
+class TransitionTicketStatusRequest(ApiModel):
+    status: str

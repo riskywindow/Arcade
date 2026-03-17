@@ -2,13 +2,18 @@
 name = "atlas-worker"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["atlas-core"]
+dependencies = ["atlas-core", "atlas-env-helpdesk", "atlas-graders", "model-gateway", "browser-runner", "bastion-gateway"]
 
 [project.scripts]
 atlas-worker = "atlas_worker.main:main"
 
 [tool.uv.sources]
 atlas-core = { workspace = true }
+atlas-env-helpdesk = { workspace = true }
+atlas-graders = { workspace = true }
+model-gateway = { workspace = true }
+browser-runner = { workspace = true }
+bastion-gateway = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

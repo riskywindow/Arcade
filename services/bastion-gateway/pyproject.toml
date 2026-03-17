@@ -3,9 +3,13 @@ name = "bastion-gateway"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+  "atlas-core",
   "fastapi>=0.115.0",
   "uvicorn>=0.30.0",
 ]
+
+[tool.uv.sources]
+atlas-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -7,6 +7,9 @@ from pydantic import ValidationError
 
 from atlas_core import (
     ActorType,
+    AuditRecordedPayload,
+    ApprovalRequestedPayload,
+    ApprovalResolvedPayload,
     Artifact,
     ArtifactAttachedPayload,
     ArtifactKind,
@@ -22,11 +25,14 @@ from atlas_core import (
     RunEventSource,
     RunEventType,
     RunReadyPayload,
+    RunResumedPayload,
+    RunStopRequestedPayload,
     RunStartedPayload,
     RunStatus,
     RunStep,
     RunStepCreatedPayload,
     RunStepStatus,
+    RunWaitingApprovalPayload,
     ScenarioRef,
     TaskRef,
     ToolCall,
@@ -110,7 +116,7 @@ def test_run_event_serializes_with_explicit_payload_shape() -> None:
     assert RunEvent.model_validate(serialized) == event
 
 
-def test_run_event_supports_all_phase_two_payloads() -> None:
+def test_run_event_supports_all_current_payloads() -> None:
     timestamp = _timestamp()
     run = _run()
     step = RunStep(
@@ -148,7 +154,13 @@ def test_run_event_supports_all_phase_two_payloads() -> None:
     payloads: list[
         RunReadyPayload
         | RunStartedPayload
+        | RunStopRequestedPayload
+        | RunWaitingApprovalPayload
+        | RunResumedPayload
         | RunStepCreatedPayload
+        | ApprovalRequestedPayload
+        | ApprovalResolvedPayload
+        | AuditRecordedPayload
         | ToolCallRecordedPayload
         | ArtifactAttachedPayload
         | RunCompletedPayload
@@ -164,10 +176,56 @@ def test_run_event_supports_all_phase_two_payloads() -> None:
             status=RunStatus.RUNNING,
             started_at=timestamp,
         ),
+        RunStopRequestedPayload(
+            event_type=RunEventType.RUN_STOP_REQUESTED,
+            run_id=run.run_id,
+            stop_request_id="stop_001",
+            operator_id="operator_001",
+            requested_at=timestamp,
+            reason="Interrupt the run locally.",
+        ),
+        RunWaitingApprovalPayload(
+            event_type=RunEventType.RUN_WAITING_APPROVAL,
+            run_id=run.run_id,
+            status=RunStatus.WAITING_APPROVAL,
+            approval_request_id="approval_001",
+            waiting_at=timestamp,
+        ),
+        RunResumedPayload(
+            event_type=RunEventType.RUN_RESUMED,
+            run_id=run.run_id,
+            status=RunStatus.RUNNING,
+            approval_request_id="approval_001",
+            resumed_at=timestamp,
+        ),
         RunStepCreatedPayload(
             event_type=RunEventType.RUN_STEP_CREATED,
             run_id=run.run_id,
             step=step,
+        ),
+        ApprovalRequestedPayload(
+            event_type=RunEventType.APPROVAL_REQUESTED,
+            run_id=run.run_id,
+            approval_request={"approval_request_id": "approval_001", "status": "pending"},
+        ),
+        ApprovalResolvedPayload(
+            event_type=RunEventType.APPROVAL_RESOLVED,
+            run_id=run.run_id,
+            approval_request={"approval_request_id": "approval_001", "status": "approved"},
+            operator_id="operator_001",
+            decided_at=timestamp,
+        ),
+        AuditRecordedPayload(
+            event_type=RunEventType.AUDIT_RECORDED,
+            run_id=run.run_id,
+            audit_record={
+                "audit_id": "audit_001",
+                "run_id": run.run_id,
+                "actor_type": "operator",
+                "event_kind": "kill_switch_triggered",
+                "occurred_at": timestamp.isoformat(),
+                "payload": {"phase": "requested"},
+            },
         ),
         ToolCallRecordedPayload(
             event_type=RunEventType.TOOL_CALL_RECORDED,
@@ -228,4 +286,35 @@ def test_grade_result_rejects_invalid_score_range() -> None:
             outcome=GradeOutcome.PASSED,
             score=1.5,
             summary="Invalid score.",
+        )
+
+
+def test_run_event_rejects_event_type_payload_mismatch() -> None:
+    run = _run()
+
+    with pytest.raises(ValidationError):
+        RunEvent(
+            event_id="evt_bad",
+            run_id=run.run_id,
+            sequence=0,
+            occurred_at=_timestamp(),
+            source=RunEventSource.WORKER,
+            actor_type=ActorType.WORKER,
+            event_type=RunEventType.RUN_READY,
+            payload=RunCreatedPayload(
+                event_type=RunEventType.RUN_CREATED,
+                run=run,
+            ),
+        )
+
+
+def test_artifact_rejects_negative_size() -> None:
+    with pytest.raises(ValidationError):
+        Artifact(
+            artifact_id="artifact_bad",
+            kind=ArtifactKind.LOG,
+            uri="minio://atlas-artifacts/bad/log.json",
+            content_type="application/json",
+            created_at=_timestamp(),
+            size_bytes=-1,
         )

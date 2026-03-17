@@ -12,6 +12,6 @@ class PackageInfo:
 
 PACKAGE_INFO = PackageInfo(
     name="atlas-core",
-    purpose="Shared Python foundation for runtime scaffolding and later domain contracts.",
-    phase_boundary="No run, scenario, or task models are implemented in Phase 1.",
+    purpose="Shared Python domain models, lifecycle rules, serialization, and run persistence contracts.",
+    phase_boundary="Environment logic, Bastion policies, hidden graders, and replay UI remain outside atlas-core through Phase 4.",
 )

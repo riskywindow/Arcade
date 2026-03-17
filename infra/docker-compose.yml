@@ -40,6 +40,14 @@ services:
     volumes:
       - minio_data:/data
 
+  bastion-sandbox-tools:
+    profiles: ["sandbox-tools"]
+    build:
+      context: ..
+      dockerfile: infra/docker/sandbox-tools/Dockerfile
+    image: atlas-bastion/sandbox-tools:local
+    command: ["python3", "--version"]
+
 volumes:
   postgres_data:
   minio_data:

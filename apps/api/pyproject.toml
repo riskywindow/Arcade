@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "atlas-core",
+  "atlas-env-helpdesk",
   "fastapi>=0.115.0",
   "uvicorn>=0.30.0",
 ]
@@ -13,6 +14,7 @@ atlas-api = "atlas_api.main:main"
 
 [tool.uv.sources]
 atlas-core = { workspace = true }
+atlas-env-helpdesk = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -1,9 +1,15 @@
 # packages/atlas-core
 
-Shared Python domain package shell.
+Shared Python domain and run-spine package.
 
-Real domain models are deferred beyond Phase 1.
+Current ownership:
+
+- typed domain models for `Environment`, `Scenario`, `Task`, `Run`, `RunStep`, `ToolCall`, `PolicyDecision`, `Artifact`, `GradeResult`, and `RunEvent`
+- centralized `Run` lifecycle validation
+- run/event/artifact serialization helpers
+- Postgres migration runner and run repository/service contracts
 
 Allowed imports:
+
 - should not import apps, services, environments, graders, or `model-gateway`
-- may remain dependency-free or host only low-level shared runtime utilities
+- should stay environment-agnostic and policy-agnostic

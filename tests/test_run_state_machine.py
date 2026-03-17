@@ -6,6 +6,7 @@ import pytest
 
 from atlas_core import (
     ActorType,
+    ApprovalRequestedPayload,
     InvalidRunEventTransitionError,
     InvalidRunTransitionError,
     Run,
@@ -15,9 +16,12 @@ from atlas_core import (
     RunEventSource,
     RunEventType,
     RunReadyPayload,
+    RunResumedPayload,
+    RunStopRequestedPayload,
     RunStepCreatedPayload,
     RunStartedPayload,
     RunStatus,
+    RunWaitingApprovalPayload,
     ScenarioRef,
     TaskRef,
     EnvironmentRef,
@@ -64,6 +68,10 @@ def _event(event_type: RunEventType) -> RunEvent:
         RunCreatedPayload
         | RunReadyPayload
         | RunStartedPayload
+        | RunStopRequestedPayload
+        | RunWaitingApprovalPayload
+        | RunResumedPayload
+        | ApprovalRequestedPayload
         | RunStepCreatedPayload
         | RunCompletedPayload
     )
@@ -84,6 +92,37 @@ def _event(event_type: RunEventType) -> RunEvent:
             run_id=run.run_id,
             status=RunStatus.RUNNING,
             started_at=_timestamp(),
+        )
+    elif event_type == RunEventType.RUN_STOP_REQUESTED:
+        payload = RunStopRequestedPayload(
+            event_type=RunEventType.RUN_STOP_REQUESTED,
+            run_id=run.run_id,
+            stop_request_id="stop_123",
+            operator_id="operator_123",
+            requested_at=_timestamp(),
+            reason="operator requested stop",
+        )
+    elif event_type == RunEventType.RUN_WAITING_APPROVAL:
+        payload = RunWaitingApprovalPayload(
+            event_type=RunEventType.RUN_WAITING_APPROVAL,
+            run_id=run.run_id,
+            status=RunStatus.WAITING_APPROVAL,
+            approval_request_id="approval_123",
+            waiting_at=_timestamp(),
+        )
+    elif event_type == RunEventType.RUN_RESUMED:
+        payload = RunResumedPayload(
+            event_type=RunEventType.RUN_RESUMED,
+            run_id=run.run_id,
+            status=RunStatus.RUNNING,
+            approval_request_id="approval_123",
+            resumed_at=_timestamp(),
+        )
+    elif event_type == RunEventType.APPROVAL_REQUESTED:
+        payload = ApprovalRequestedPayload(
+            event_type=RunEventType.APPROVAL_REQUESTED,
+            run_id=run.run_id,
+            approval_request={"approval_request_id": "approval_123"},
         )
     else:
         payload = RunCompletedPayload(
@@ -134,9 +173,38 @@ def test_transition_status_for_event_maps_lifecycle_events() -> None:
     assert transition_status_for_event(_event(RunEventType.RUN_CREATED)) is None
     assert transition_status_for_event(_event(RunEventType.RUN_READY)) == RunStatus.READY
     assert transition_status_for_event(_event(RunEventType.RUN_STARTED)) == RunStatus.RUNNING
+    assert transition_status_for_event(_event(RunEventType.RUN_STOP_REQUESTED)) is None
+    assert transition_status_for_event(_event(RunEventType.RUN_WAITING_APPROVAL)) == RunStatus.WAITING_APPROVAL
+    assert transition_status_for_event(_event(RunEventType.RUN_RESUMED)) == RunStatus.RUNNING
+    assert transition_status_for_event(_event(RunEventType.APPROVAL_REQUESTED)) is None
     assert transition_status_for_event(_event(RunEventType.RUN_COMPLETED)) == RunStatus.SUCCEEDED
 
 
 def test_validate_event_transition_rejects_invalid_lifecycle_event() -> None:
     with pytest.raises(InvalidRunEventTransitionError):
         validate_event_transition(RunStatus.PENDING, _event(RunEventType.RUN_STARTED))
+
+
+def test_validate_run_transition_allows_waiting_approval_resume() -> None:
+    transition = validate_run_transition(RunStatus.WAITING_APPROVAL, RunStatus.RUNNING)
+
+    assert transition.from_status == RunStatus.WAITING_APPROVAL
+    assert transition.to_status == RunStatus.RUNNING
+
+
+def test_validate_run_transition_rejects_terminal_to_running() -> None:
+    with pytest.raises(InvalidRunTransitionError):
+        validate_run_transition(RunStatus.SUCCEEDED, RunStatus.RUNNING)
+
+
+def test_validate_event_transition_allows_waiting_approval_and_resume_events() -> None:
+    waiting_transition = validate_event_transition(RunStatus.RUNNING, _event(RunEventType.RUN_WAITING_APPROVAL))
+    resumed_transition = validate_event_transition(
+        RunStatus.WAITING_APPROVAL,
+        _event(RunEventType.RUN_RESUMED),
+    )
+
+    assert waiting_transition is not None
+    assert waiting_transition.to_status == RunStatus.WAITING_APPROVAL
+    assert resumed_transition is not None
+    assert resumed_transition.to_status == RunStatus.RUNNING

@@ -504,6 +504,10 @@ class RunService:
         self.get_run(run_id)
         return self._repository.list_run_artifacts(run_id)
 
+    def next_event_sequence(self, run_id: str) -> int:
+        self.get_run(run_id)
+        return self._repository.next_event_sequence(run_id)
+
     def append_run_event(self, event: RunEvent) -> RunEvent:
         run = self.get_run(event.run_id)
         expected_sequence = self._repository.next_event_sequence(event.run_id)
