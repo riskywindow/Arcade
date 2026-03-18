@@ -917,12 +917,13 @@ class SimpleAgentLoopRunner:
         source: RunEventSource = RunEventSource.BASTION,
         actor_type: ActorType = ActorType.BASTION,
     ) -> None:
-        for index, record in enumerate(records, start=1):
+        for record in records:
+            sequence = self._run_service.next_event_sequence(context.run_id)
             self._run_service.append_run_event(
                 RunEvent(
-                    event_id=f"{context.run_id}-event-audit-{record.audit_id}-{index:02d}",
+                    event_id=f"{context.run_id}-event-audit-{sequence:03d}-{record.audit_id}",
                     run_id=context.run_id,
-                    sequence=self._run_service.next_event_sequence(context.run_id),
+                    sequence=sequence,
                     occurred_at=record.occurred_at,
                     source=source,
                     actor_type=actor_type,

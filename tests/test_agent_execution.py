@@ -474,6 +474,12 @@ def test_execute_policy_protected_demo_run_blocks_shortcut_then_resumes_after_ap
     assert "approval.resolved" in event_types
     assert "run.resumed" in event_types
     assert event_types[-1] == "run.completed"
+    audit_event_ids = [
+        event.event_id
+        for event in run_service.list_run_events(result.run_id)
+        if event.event_type == RunEventType.AUDIT_RECORDED
+    ]
+    assert len(audit_event_ids) == len(set(audit_event_ids))
 
 
 def test_policy_protected_demo_emits_replay_visible_security_audit_records(tmp_path: Path) -> None:

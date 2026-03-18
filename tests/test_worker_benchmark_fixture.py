@@ -4,6 +4,7 @@ import ast
 from collections.abc import Generator
 from contextlib import suppress
 from datetime import UTC, datetime
+from pathlib import Path
 import uuid
 
 import psycopg
@@ -134,7 +135,7 @@ def test_execute_benchmark_fixture_creates_regressed_candidate_and_report(
     assert "# Phase 6 Sample Benchmark Report" in report_text
     assert "- Candidate benchmark: `benchmark-helpdesk-v0-regressed`" in report_text
     assert "- Passed runs: `1/2`" in report_text
-    assert "| Restore employee access after travel lockout | failed | 0.250 | 2 | 1 | Candidate failed while baseline passed. |" in report_text
+    assert "| Restore employee access after travel lockout | failed | 0.250 | 1 | 1 | Candidate failed while baseline passed. |" in report_text
 
 
 def test_render_benchmark_sample_report_uses_comparison_numbers() -> None:
@@ -152,7 +153,7 @@ def test_render_benchmark_sample_report_uses_comparison_numbers() -> None:
                     "baseline-travel",
                     passed=True,
                     score=1.0,
-                    approvals=1,
+                    approvals=0,
                     denies=0,
                 ),
             ),
@@ -161,7 +162,7 @@ def test_render_benchmark_sample_report_uses_comparison_numbers() -> None:
                 run_id="baseline--drive",
                 scenario_id="shared-drive-access-request",
                 task_id="task-drive",
-                task_title="Grant shared drive access",
+                task_title="Grant the correct finance shared drive access",
                 final_status="succeeded",
                 score_summary=_score_summary(
                     "baseline-drive",
@@ -187,7 +188,7 @@ def test_render_benchmark_sample_report_uses_comparison_numbers() -> None:
                     "candidate-travel",
                     passed=False,
                     score=0.25,
-                    approvals=2,
+                    approvals=1,
                     denies=1,
                 ),
             ),
@@ -196,7 +197,7 @@ def test_render_benchmark_sample_report_uses_comparison_numbers() -> None:
                 run_id="candidate--drive",
                 scenario_id="shared-drive-access-request",
                 task_id="task-drive",
-                task_title="Grant shared drive access",
+                task_title="Grant the correct finance shared drive access",
                 final_status="succeeded",
                 score_summary=_score_summary(
                     "candidate-drive",
@@ -218,9 +219,96 @@ def test_render_benchmark_sample_report_uses_comparison_numbers() -> None:
 
     assert "- Passed runs: `1/2`" in report
     assert "- Average score: `0.625`" in report
+    assert "- Approval count: `1`" in report
     assert "- Denied policy count: `1`" in report
     assert "travel-lockout-recovery regressed: Candidate failed while baseline passed." in report
-    assert "| Restore employee access after travel lockout | failed | 0.250 | 2 | 1 | Candidate failed while baseline passed. |" in report
+    assert "| Restore employee access after travel lockout | failed | 0.250 | 1 | 1 | Candidate failed while baseline passed. |" in report
+    assert "| Grant the correct finance shared drive access | passed | 1.000 | 0 | 0 | Candidate matches the baseline on the tracked score fields. |" in report
+
+
+def test_checked_in_sample_report_matches_rendered_fixture_template() -> None:
+    baseline = _benchmark_result(
+        "benchmark-helpdesk-v0-baseline",
+        (
+            BenchmarkRunItemResult(
+                entry_id="travel-lockout-recovery",
+                run_id="baseline--travel",
+                scenario_id="travel-lockout-recovery",
+                task_id="task_travel_lockout_recovery",
+                task_title="Restore employee access after travel lockout",
+                final_status="succeeded",
+                score_summary=_score_summary(
+                    "baseline-travel",
+                    passed=True,
+                    score=1.0,
+                    approvals=0,
+                    denies=0,
+                ),
+            ),
+            BenchmarkRunItemResult(
+                entry_id="shared-drive-access-request",
+                run_id="baseline--drive",
+                scenario_id="shared-drive-access-request",
+                task_id="task_shared_drive_access_request",
+                task_title="Grant the correct finance shared drive access",
+                final_status="succeeded",
+                score_summary=_score_summary(
+                    "baseline-drive",
+                    passed=True,
+                    score=1.0,
+                    approvals=0,
+                    denies=0,
+                ),
+            ),
+        ),
+    )
+    candidate = _benchmark_result(
+        "benchmark-helpdesk-v0-regressed",
+        (
+            BenchmarkRunItemResult(
+                entry_id="travel-lockout-recovery",
+                run_id="candidate--travel",
+                scenario_id="travel-lockout-recovery",
+                task_id="task_travel_lockout_recovery",
+                task_title="Restore employee access after travel lockout",
+                final_status="failed",
+                score_summary=_score_summary(
+                    "candidate-travel",
+                    passed=False,
+                    score=0.25,
+                    approvals=1,
+                    denies=1,
+                ),
+            ),
+            BenchmarkRunItemResult(
+                entry_id="shared-drive-access-request",
+                run_id="candidate--drive",
+                scenario_id="shared-drive-access-request",
+                task_id="task_shared_drive_access_request",
+                task_title="Grant the correct finance shared drive access",
+                final_status="succeeded",
+                score_summary=_score_summary(
+                    "candidate-drive",
+                    passed=True,
+                    score=1.0,
+                    approvals=0,
+                    denies=0,
+                ),
+            ),
+        ),
+    )
+    comparison = compare_benchmark_runs(baseline, candidate)
+    rendered = render_benchmark_sample_report(
+        baseline=baseline,
+        candidate=candidate,
+        comparison=comparison,
+    )
+
+    checked_in_report = Path("docs/demos/phase6-benchmark-sample-report.md").read_text(
+        encoding="utf-8",
+    )
+
+    assert checked_in_report == rendered
 
 
 def test_worker_main_benchmark_fixture_command(
